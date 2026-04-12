@@ -20,6 +20,7 @@
             </div>
             <ul class="nav-links">
                 <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i> Dashboard</li>
+                <li data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> Historical Data</li>
                 <li data-tab="camera"><i class="fa-solid fa-camera"></i> Camera Feed</li>
                 <li data-tab="controls"><i class="fa-solid fa-sliders"></i> Manual Controls</li>
                 <li data-tab="timelapse"><i class="fa-solid fa-film"></i> Timelapse</li>
@@ -96,6 +97,42 @@
                         <div class="glass-panel chart-card">
                             <h3><i class="fa-solid fa-chart-line"></i> Humidity History</h3>
                             <canvas id="humChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- History Tab -->
+                <section id="history" class="tab-content">
+                    <div class="glass-panel history-container">
+                        <div class="history-header">
+                            <h2>Detailed Historical Data</h2>
+                            <div class="history-controls">
+                                <select id="hist-sensor-select" onchange="app.loadFullHistory()">
+                                    <option value="temperature">Temperature (°C)</option>
+                                    <option value="humidity">Humidity (%)</option>
+                                    <option value="water_flow">Water Flow (L)</option>
+                                </select>
+                                <button class="btn secondary sm" onclick="app.loadFullHistory()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                            </div>
+                        </div>
+                        
+                        <div class="full-chart-card glass-panel">
+                            <canvas id="fullHistoryChart"></canvas>
+                        </div>
+
+                        <div class="history-table-wrapper glass-panel">
+                            <h3>Measurements Log</h3>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-table-body">
+                                    <!-- Data rows here -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>

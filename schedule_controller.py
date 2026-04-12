@@ -36,11 +36,12 @@ class ScheduleManager:
     def apply_cycle_schedule(self, cycle: dict) -> None:
         """
         Applies a lighting and irrigation schedule based on the cycle config.
-        Supports granular flags for sunrise/sunset and full cycle behavior.
+        Supports independent step durations for Red and Blue lights.
         """
         initial_time = cycle.get("initial_time", 8)
         total_hours = cycle.get("total_hours", 12)
-        step_mins = cycle.get("sunrise_step_mins", 15)
+        red_step = cycle.get("ultra_red_step_mins", 15)
+        blue_step = cycle.get("infra_blue_step_mins", 15)
         
         # Granular Flags
         red_sunrise = cycle.get("ultra_red_sunrise", False)
@@ -62,12 +63,12 @@ class ScheduleManager:
         # --- Lighting Logic ---
         start_dt = datetime.strptime(f"{initial_time:02d}:00", "%H:%M")
         t0 = start_dt.strftime("%H:%M")
-        t1 = (start_dt + timedelta(minutes=step_mins)).strftime("%H:%M")
-        t2 = (start_dt + timedelta(minutes=step_mins*2)).strftime("%H:%M")
+        t1 = (start_dt + timedelta(minutes=red_step)).strftime("%H:%M")
+        t2 = (start_dt + timedelta(minutes=red_step + blue_step)).strftime("%H:%M")
         
         end_dt = start_dt + timedelta(hours=total_hours)
-        e0 = (end_dt - timedelta(minutes=step_mins*2)).strftime("%H:%M")
-        e1 = (end_dt - timedelta(minutes=step_mins)).strftime("%H:%M")
+        e0 = (end_dt - timedelta(minutes=red_step + blue_step)).strftime("%H:%M")
+        e1 = (end_dt - timedelta(minutes=red_step)).strftime("%H:%M")
         e2 = end_dt.strftime("%H:%M")
 
         # Start Sequence
@@ -99,7 +100,7 @@ class ScheduleManager:
                 self.led_controller.led_controls["ultrablue_on"]()
             time.sleep(1)
             self.led_controller.led_controls["main_off"]()
-            if not red_full and not red_sunrise: # In case it was somehow ON
+            if not red_full and not red_sunrise:
                  self.led_controller.led_controls["infrared_off"]()
             if not blue_full and not blue_sunrise:
                  self.led_controller.led_controls["ultrablue_off"]()
@@ -138,7 +139,8 @@ class ScheduleManager:
         now = datetime.now()
         initial_time = cycle.get("initial_time", 8)
         total_hours = cycle.get("total_hours", 12)
-        step_mins = cycle.get("sunrise_step_mins", 15)
+        red_step = cycle.get("ultra_red_step_mins", 15)
+        blue_step = cycle.get("infra_blue_step_mins", 15)
         
         red_sunrise = cycle.get("ultra_red_sunrise", False)
         red_full = cycle.get("ultra_red_full", False)
@@ -150,8 +152,8 @@ class ScheduleManager:
             dt = start_dt + timedelta(minutes=m)
             return dt.hour, dt.minute
 
-        t0, t1, t2 = 0, step_mins, step_mins * 2
-        e0, e1, e2 = (total_hours * 60) - (step_mins * 2), (total_hours * 60) - step_mins, total_hours * 60
+        t0, t1, t2 = 0, red_step, red_step + blue_step
+        e0, e1, e2 = (total_hours * 60) - (red_step + blue_step), (total_hours * 60) - red_step, total_hours * 60
 
         should_red = False
         should_blue = False

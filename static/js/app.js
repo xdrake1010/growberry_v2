@@ -45,6 +45,10 @@ const app = {
                 if(target === 'dashboard') {
                     this.updateCharts();
                 }
+
+                if(target === 'history') {
+                    this.loadFullHistory();
+                }
             });
         });
     },
@@ -72,6 +76,20 @@ const app = {
             data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', borderWidth: 2, fill: true, backgroundColor: 'rgba(59,130,246,0.05)' }] },
             options: chartOptions
         });
+
+        // Full History Chart (Detailed View)
+        this.fullHistoryChart = new Chart(document.getElementById('fullHistoryChart'), {
+            type: 'line',
+            data: { labels: [], datasets: [{ data: [], borderColor: '#10b981', borderWidth: 2, fill: true, backgroundColor: 'rgba(16,185,129,0.05)' }] },
+            options: {
+                ...chartOptions,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45 } }
+                }
+            }
+        });
     },
 
     async updateCharts() {
@@ -95,6 +113,37 @@ const app = {
                 this.humChart.update('none');
             }
         } catch(e) { console.error("Chart update failed", e); }
+    },
+
+    async loadFullHistory() {
+        try {
+            const sensor = document.getElementById('hist-sensor-select').value;
+            const res = await fetch(`/api/history?sensor=${sensor}&limit=500`);
+            const data = await res.json();
+
+            // Update Chart
+            this.fullHistoryChart.data.labels = data.map(d => new Date(d.timestamp).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit'}));
+            this.fullHistoryChart.data.datasets[0].data = data.map(d => d.value);
+            this.fullHistoryChart.data.datasets[0].borderColor = sensor === 'temperature' ? '#f59e0b' : (sensor === 'humidity' ? '#3b82f6' : '#10b981');
+            this.fullHistoryChart.update();
+
+            // Update Table
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            // Show last 50 in table for performance
+            data.slice().reverse().slice(0, 50).forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${new Date(row.timestamp).toLocaleString()}</td>
+                    <td style="font-weight:700;">${row.value}${sensor === 'temperature' ? '°C' : (sensor === 'humidity' ? '%' : ' L')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+        } catch(e) {
+            console.error("Full history load failed", e);
+            this.showToast("Failed to load history data", true);
+        }
     },
 
     startClock() {
@@ -279,7 +328,9 @@ const app = {
                     <div class="input-group"><label>Duration (days)</label><input type="number" class="cyc-duration" value="${config.duration_days || 7}"></div>
                     <div class="input-group"><label>Start Hour (0-23)</label><input type="number" class="cyc-light-start" value="${config.initial_time || 8}"></div>
                     <div class="input-group"><label>Total Light Hours</label><input type="number" class="cyc-hours" value="${config.total_hours || 18}"></div>
-                    <div class="input-group"><label>Step Duration (mins)</label><input type="number" class="cyc-step" value="${config.sunrise_step_mins || 15}"></div>
+                    
+                    <div class="input-group"><label>Red Step (mins)</label><input type="number" class="cyc-red-step" value="${config.ultra_red_step_mins || 15}"></div>
+                    <div class="input-group"><label>Blue Step (mins)</label><input type="number" class="cyc-blue-step" value="${config.infra_blue_step_mins || 15}"></div>
                     
                     <div class="input-group"><label>Irrigation Time</label><input type="time" class="cyc-irr-start" value="${config.irrigation_start_time || '08:00'}"></div>
                     <div class="input-group"><label>Irrigation Secs</label><input type="number" class="cyc-irr-timer" value="${config.irrigation_timer || 15}"></div>
@@ -344,7 +395,9 @@ const app = {
                 duration_days: parseInt(item.querySelector('.cyc-duration').value),
                 initial_time: parseInt(item.querySelector('.cyc-light-start').value),
                 total_hours: parseInt(item.querySelector('.cyc-hours').value),
-                sunrise_step_mins: parseInt(item.querySelector('.cyc-step').value),
+                
+                ultra_red_step_mins: parseInt(item.querySelector('.cyc-red-step').value),
+                infra_blue_step_mins: parseInt(item.querySelector('.cyc-blue-step').value),
                 
                 ultra_red_sunrise: item.querySelector('.cyc-rs').checked,
                 ultra_red_full: item.querySelector('.cyc-rf').checked,
