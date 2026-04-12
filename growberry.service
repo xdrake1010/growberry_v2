@@ -1,0 +1,14 @@
+[Unit]
+Description=Growberry Automated Cultivation System
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 app.py
+WorkingDirectory=/home/xdrake/growberry_v2
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target

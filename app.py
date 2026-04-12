@@ -1,6 +1,7 @@
 import time
 import schedule
 import threading
+import logging
 import RPi.GPIO as GPIO
 from flask import Flask, Response, jsonify
 from flask_cors import CORS
@@ -8,13 +9,18 @@ from routes import api, init_routes
 from hardware_controllers import LEDController, VentilationController, TankController, IrrigationController
 from schedule_controller import ScheduleManager
 from camera_controller import CameraController
-from config import GPIO_PINS, load_plants_config, save_plants_config
+from config import GPIO_PINS, load_plants_config, save_plants_config, setup_logging
+
+# Initialize logging
+setup_logging()
+logger = logging.getLogger("Growberry")
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
 
 class ApplicationSystem:
     def __init__(self):
+        logger.info("Initializing Application System...")
         # Initialize GPIO globally and set up pins
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
@@ -53,8 +59,10 @@ class ApplicationSystem:
         self.camera_controller = CameraController(cosecha_name=self.active_cosecha)
         
         self.lock = threading.Lock()
+        logger.info("System Initialized Successfully.")
         
     def daemon_loop(self):
+        logger.info("Starting background daemon thread...")
         # Initial schedule setup
         self.schedule_manager.refresh_schedule()
         
@@ -65,8 +73,11 @@ class ApplicationSystem:
         schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule)
         
         while True:
-            with self.lock:
-                schedule.run_pending()
+            try:
+                with self.lock:
+                    schedule.run_pending()
+            except Exception as e:
+                logger.error(f"Error in daemon loop: {e}")
             time.sleep(30)
 
 system = ApplicationSystem()
@@ -80,4 +91,6 @@ def index():
 if __name__ == '__main__':
     daemon_thread = threading.Thread(target=system.daemon_loop, daemon=True)
     daemon_thread.start()
+    
+    logger.info("Starting Flask server on port 5000...")
     app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)

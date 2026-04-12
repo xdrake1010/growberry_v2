@@ -1,8 +1,11 @@
 import cv2
 import os
 import time
+import logging
 from datetime import datetime
 from config import TIMELAPSE_BASE_DIR
+
+logger = logging.getLogger("Growberry.Camera")
 
 class CameraController:
     def __init__(self, cosecha_name="default"):
@@ -16,10 +19,7 @@ class CameraController:
     def capture_timelapse_frame(self):
         """Captures a single frame safely and saves it to the timelapse directory structure."""
         if self.is_streaming:
-             # Skip or handle capture if streaming? 
-             # On a Pi, opening the index 0 twice won't work. We might skip if someone is watching live.
-             # For now, let's assume we skip if streaming.
-             print("Skipping timelapse capture (Camera is being viewed live).")
+             logger.info("Skipping timelapse capture (Camera is being viewed live).")
              return False
 
         today_str = datetime.now().strftime("%Y-%m-%d")
@@ -31,22 +31,31 @@ class CameraController:
         filename = f"{timestamp}.jpg"
         filepath = os.path.join(target_dir, filename)
 
+        logger.info(f"Capturing timelapse frame: {filename}")
         try:
             camera = cv2.VideoCapture(0)
+            if not camera.isOpened():
+                logger.error("Could not open camera for timelapse")
+                return False
+                
             # Give camera a moment to adjust brightness/focus
             camera.read()
             time.sleep(0.5) 
             success, frame = camera.read()
             if success:
                 cv2.imwrite(filepath, frame)
+                logger.info(f"Saved timelapse frame to {filepath}")
+            else:
+                logger.error("Failed to read frame from camera")
             camera.release()
             return success
         except Exception as e:
-            print(f"Error capturing timelapse: {e}")
+            logger.error(f"Error capturing timelapse: {e}")
             return False
 
     def generate_live_stream(self):
         """Generator for the MJPEG stream to serve to the web interface"""
+        logger.info("Starting live stream...")
         self.is_streaming = True
         camera = cv2.VideoCapture(0)
         try:
@@ -57,6 +66,7 @@ class CameraController:
             while True:
                 success, frame = camera.read()
                 if not success:
+                    logger.warning("Failed to read frame during stream")
                     break
                 
                 # Compress heavily for the live web feed
@@ -68,5 +78,6 @@ class CameraController:
                 # Tiny sleep to drop FPS and save CPU
                 time.sleep(0.1) 
         finally:
+            logger.info("Stopping live stream...")
             self.is_streaming = False
             camera.release()
