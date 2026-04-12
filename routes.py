@@ -103,7 +103,9 @@ def set_configs():
     
     # Hot-reload system 
     _system.config_data = new_data
-    _system.schedule_manager.cycles = new_data.get("plants", {}).get("default", {}).get("cycles", {})
+    active = new_data.get("active_cosecha", "default")
+    _system.schedule_manager.active_cosecha = active
+    _system.schedule_manager.cycles = new_data.get("plants", {}).get(active, {}).get("cycles", {})
     _system.schedule_manager.refresh_schedule()
     return jsonify({"status": "success", "message": "Config updated"})
 

@@ -1,5 +1,5 @@
 {
-    "active_cosecha": "Tomato_Batch_1",
+    "active_cosecha": "default",
     "plants": {
         "default": {
             "name": "Standard Mix",
@@ -9,57 +9,53 @@
                     "duration_days": 3,
                     "initial_time": 8,
                     "total_hours": 23,
-                    "main_delay": 30,
-                    "ultrablue_delay": 15,
-                    "infrared_delay": 15,
+                    "logic_profile": "vegetation",
+                    "sunrise_step_mins": 15,
                     "tank_time": 2,
                     "watering_days": [1, 3, 5],
                     "multiplier": 1,
-                    "irrigation_time": 15,
+                    "irrigation_start_time": "08:00",
                     "irrigation_timer": 15,
-                    "extra_red": false
+                    "target_volume_liters": 0.0
                 },
                 "vegetation": {
                     "duration_days": 35,
                     "initial_time": 8,
                     "total_hours": 21,
-                    "main_delay": 30,
-                    "ultrablue_delay": 15,
-                    "infrared_delay": 15,
+                    "logic_profile": "vegetation",
+                    "sunrise_step_mins": 15,
                     "tank_time": 4,
                     "watering_days": [0, 2, 4, 6],
                     "multiplier": 1,
-                    "irrigation_time": 15,
+                    "irrigation_start_time": "08:00",
                     "irrigation_timer": 15,
-                    "extra_red": false
+                    "target_volume_liters": 0.0
                 },
                 "pre_blooming": {
                     "duration_days": 8,
                     "initial_time": 8,
                     "total_hours": 17,
-                    "main_delay": 30,
-                    "ultrablue_delay": 15,
-                    "infrared_delay": 15,
+                    "logic_profile": "blooming",
+                    "sunrise_step_mins": 15,
                     "tank_time": 15,
                     "watering_days": [0, 1, 3, 5, 6],
                     "multiplier": 1,
-                    "irrigation_time": 15,
+                    "irrigation_start_time": "08:00",
                     "irrigation_timer": 15,
-                    "extra_red": true
+                    "target_volume_liters": 0.0
                 },
                 "blooming": {
                     "duration_days": 60,
                     "initial_time": 8,
                     "total_hours": 12,
-                    "main_delay": 30,
-                    "ultrablue_delay": 15,
-                    "infrared_delay": 15,
+                    "logic_profile": "blooming",
+                    "sunrise_step_mins": 15,
                     "tank_time": 15,
                     "watering_days": [0, 1, 2, 3, 4, 5, 6],
                     "multiplier": 1,
-                    "irrigation_time": 15,
+                    "irrigation_start_time": "08:00",
                     "irrigation_timer": 15,
-                    "extra_red": true
+                    "target_volume_liters": 0.0
                 }
             }
         }

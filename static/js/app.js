@@ -131,9 +131,10 @@ const app = {
             this.updateBadge('st-irr', data.irrigation);
 
             // Cycle Data
+            const cycleEl = document.getElementById('val-cycle');
             if(data.cycle_info && data.cycle_info.status === 'active') {
                 const c = data.cycle_info;
-                document.getElementById('val-cycle').textContent = c.current_cycle.toUpperCase();
+                cycleEl.textContent = c.current_cycle.toUpperCase();
                 
                 document.getElementById('cyc-elapsed').textContent = c.days_elapsed;
                 document.getElementById('cyc-rem').textContent = c.days_remaining;
@@ -144,6 +145,11 @@ const app = {
                 
                 document.getElementById('cyc-start').textContent = c.cycle_start_date.split('T')[0];
                 document.getElementById('cyc-end').textContent = c.cycle_end_date.split('T')[0];
+            } else {
+                cycleEl.textContent = 'INACTIVE';
+                document.getElementById('cyc-elapsed').textContent = '0';
+                document.getElementById('cyc-rem').textContent = '0';
+                document.getElementById('cyc-progress').style.width = '0%';
             }
 
         } catch (e) {
@@ -264,13 +270,27 @@ const app = {
                 </div>
                 <div class="cycle-grid">
                     <div class="input-group"><label>Duration (days)</label><input type="number" class="cyc-duration" value="${config.duration_days || 7}"></div>
-                    <div class="input-group"><label>Start Hour (0-23)</label><input type="number" class="cyc-start" value="${config.initial_time || 8}"></div>
-                    <div class="input-group"><label>Light Hours</label><input type="number" class="cyc-hours" value="${config.total_hours || 18}"></div>
-                    <div class="input-group"><label>Extra Red</label>
-                        <select class="cyc-red">
-                            <option value="false" ${!config.extra_red ? 'selected' : ''}>No</option>
-                            <option value="true" ${config.extra_red ? 'selected' : ''}>Yes (All Day)</option>
+                    <div class="input-group"><label>Start Hour (0-23)</label><input type="number" class="cyc-light-start" value="${config.initial_time || 8}"></div>
+                    <div class="input-group"><label>Total Light Hours</label><input type="number" class="cyc-hours" value="${config.total_hours || 18}"></div>
+                    <div class="input-group"><label>Logic Profile</label>
+                        <select class="cyc-profile">
+                            <option value="vegetation" ${config.logic_profile === 'vegetation' ? 'selected' : ''}>Vegetation (With Blue)</option>
+                            <option value="blooming" ${config.logic_profile === 'blooming' ? 'selected' : ''}>Blooming (Red+Main)</option>
                         </select>
+                    </div>
+                    <div class="input-group"><label>Step Duration (mins)</label><input type="number" class="cyc-step" value="${config.sunrise_step_mins || 15}"></div>
+                    <div class="input-group"><label>Irrigation Time</label><input type="time" class="cyc-irr-start" value="${config.irrigation_start_time || '08:00'}"></div>
+                    <div class="input-group"><label>Irrigation Secs</label><input type="number" class="cyc-irr-timer" value="${config.irrigation_timer || 15}"></div>
+                    <div class="input-group"><label>Target Volume (L)</label><input type="number" step="0.1" class="cyc-volume" value="${config.target_volume_liters || 0}"></div>
+                </div>
+                <div class="watering-days-selector" style="margin-top:10px;">
+                    <label style="display:block; font-size: 0.8em; margin-bottom:5px;">Watering Days</label>
+                    <div style="display:flex; gap: 8px; flex-wrap: wrap;">
+                        ${['M','T','W','T','F','S','S'].map((day, i) => `
+                            <label style="font-size: 0.7em; cursor:pointer;">
+                                <input type="checkbox" class="cyc-days" value="${i}" ${(config.watering_days || [0,1,2,3,4,5,6]).includes(i) ? 'checked' : ''}> ${day}
+                            </label>
+                        `).join('')}
                     </div>
                 </div>
                 <button class="btn danger-sm" style="margin-top:12px;" onclick="document.getElementById('${id}').remove()">Remove Cycle</button>
@@ -300,12 +320,22 @@ const app = {
         document.querySelectorAll('.cycle-item').forEach(item => {
             const name = item.querySelector('.cyc-name').value;
             if(!name) return;
+            
+            const selectedDays = [];
+            item.querySelectorAll('.cyc-days:checked').forEach(cb => selectedDays.push(parseInt(cb.value)));
+
             cycles[name] = {
                 duration_days: parseInt(item.querySelector('.cyc-duration').value),
-                initial_time: parseInt(item.querySelector('.cyc-start').value),
+                initial_time: parseInt(item.querySelector('.cyc-light-start').value),
                 total_hours: parseInt(item.querySelector('.cyc-hours').value),
-                main_delay: 30, ultrablue_delay: 15, infrared_delay: 15,
-                extra_red: item.querySelector('.cyc-red').value === 'true'
+                logic_profile: item.querySelector('.cyc-profile').value,
+                sunrise_step_mins: parseInt(item.querySelector('.cyc-step').value),
+                irrigation_start_time: item.querySelector('.cyc-irr-start').value,
+                irrigation_timer: parseInt(item.querySelector('.cyc-irr-timer').value),
+                target_volume_liters: parseFloat(item.querySelector('.cyc-volume').value),
+                watering_days: selectedDays,
+                multiplier: 1,
+                tank_time: 15
             };
         });
 
