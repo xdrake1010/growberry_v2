@@ -36,15 +36,83 @@ def setup_logging():
         ]
     )
 
+def get_default_config():
+    """Returns the hardcoded default 'Standard Mix' harvest plan."""
+    return {
+        "active_cosecha": "Standard_Mix",
+        "plants": {
+            "Standard_Mix": {
+                "name": "Standard Mix",
+                "start_date": datetime.now().strftime("%Y-%m-%d"),
+                "cycles": {
+                    "seeding": {
+                        "duration_days": 3,
+                        "initial_time": 8,
+                        "total_hours": 23,
+                        "ultra_red_step_mins": 15,
+                        "infra_blue_step_mins": 15,
+                        "ultra_red_sunrise": true,
+                        "ultra_red_full": false,
+                        "infra_blue_sunrise": true,
+                        "infra_blue_full": true,
+                        "tank_time": 2,
+                        "watering_days": [1, 3, 5],
+                        "multiplier": 1,
+                        "irrigation_start_time": "08:00",
+                        "irrigation_timer": 15,
+                        "target_volume_liters": 0.0
+                    },
+                    "vegetation": {
+                        "duration_days": 35,
+                        "initial_time": 8,
+                        "total_hours": 21,
+                        "ultra_red_step_mins": 15,
+                        "infra_blue_step_mins": 15,
+                        "ultra_red_sunrise": true,
+                        "ultra_red_full": false,
+                        "infra_blue_sunrise": true,
+                        "infra_blue_full": true,
+                        "tank_time": 4,
+                        "watering_days": [0, 2, 4, 6],
+                        "multiplier": 1,
+                        "irrigation_start_time": "08:00",
+                        "irrigation_timer": 15,
+                        "target_volume_liters": 0.0
+                    },
+                    "blooming": {
+                        "duration_days": 60,
+                        "initial_time": 8,
+                        "total_hours": 12,
+                        "ultra_red_step_mins": 15,
+                        "infra_blue_step_mins": 15,
+                        "ultra_red_sunrise": true,
+                        "ultra_red_full": true,
+                        "infra_blue_sunrise": false,
+                        "infra_blue_full": false,
+                        "tank_time": 15,
+                        "watering_days": [0, 1, 2, 3, 4, 5, 6],
+                        "multiplier": 1,
+                        "irrigation_start_time": "08:00",
+                        "irrigation_timer": 15,
+                        "target_volume_liters": 0.0
+                    }
+                }
+            }
+        }
+    }
+
 def load_plants_config():
     if not os.path.exists(PLANTS_CONFIG_FILE):
-        return {}
+        return get_default_config()
     try:
         with open(PLANTS_CONFIG_FILE, 'r') as f:
-            return json.load(f)
+            data = json.load(f)
+            if not data or "plants" not in data or not data["plants"]:
+                return get_default_config()
+            return data
     except Exception as e:
         logging.error(f"Error loading config: {e}")
-        return {}
+        return get_default_config()
 
 def save_plants_config(config_dict):
     try:
