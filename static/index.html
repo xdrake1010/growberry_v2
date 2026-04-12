@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="app-container">
@@ -85,6 +86,17 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="charts-row">
+                        <div class="glass-panel chart-card">
+                            <h3><i class="fa-solid fa-chart-line"></i> Temperature History</h3>
+                            <canvas id="tempChart"></canvas>
+                        </div>
+                        <div class="glass-panel chart-card">
+                            <h3><i class="fa-solid fa-chart-line"></i> Humidity History</h3>
+                            <canvas id="humChart"></canvas>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- Camera Tab -->
@@ -153,11 +165,39 @@
                 <!-- Settings & Configs Tab -->
                 <section id="settings" class="tab-content">
                     <div class="glass-panel">
-                        <h2>Plant Configuration (JSON)</h2>
-                        <p class="subtitle">Modify the JSON definitions of your harvest and cycles below.</p>
-                        <textarea id="config-editor" class="code-editor" rows="20"></textarea>
-                        <div class="actions">
-                            <button class="btn primary" onclick="app.saveConfig()">Save & Reload System</button>
+                        <h2>Harvest Plan Builder</h2>
+                        <p class="subtitle">Visually manage your cultivation cycles and parameters.</p>
+                        
+                        <div class="config-form">
+                            <div class="input-group">
+                                <label>Active Cosecha Name</label>
+                                <input type="text" id="cfg-cosecha-name" placeholder="e.g. Tomato_Batch_1">
+                            </div>
+                            <div class="input-group">
+                                <label>Start Date</label>
+                                <input type="date" id="cfg-start-date">
+                            </div>
+
+                            <div class="cycles-editor">
+                                <div class="cycles-header">
+                                    <h3>Cultivation Cycles</h3>
+                                    <button class="btn secondary sm" onclick="app.addCycleField()"><i class="fa-solid fa-plus"></i> Add Cycle</button>
+                                </div>
+                                <div id="cycles-list" class="cycles-list">
+                                    <!-- Dynamic cycles will be added here -->
+                                </div>
+                            </div>
+
+                            <div class="actions">
+                                <button class="btn primary" onclick="app.generateAndSaveConfig()"><i class="fa-solid fa-floppy-disk"></i> Save Harvest Plan</button>
+                                <button class="btn secondary" onclick="app.toggleAdvancedMode()">Advanced JSON Mode</button>
+                            </div>
+                        </div>
+
+                        <div id="advanced-config" class="advanced-mode hidden">
+                            <h3>Advanced JSON Editor</h3>
+                            <textarea id="config-editor" class="code-editor" rows="15"></textarea>
+                            <button class="btn primary" onclick="app.saveConfig()">Save Raw JSON</button>
                         </div>
                     </div>
                 </section>

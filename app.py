@@ -9,6 +9,7 @@ from routes import api, init_routes
 from hardware_controllers import LEDController, VentilationController, TankController, IrrigationController
 from schedule_controller import ScheduleManager
 from camera_controller import CameraController
+from database_manager import DatabaseManager
 from config import GPIO_PINS, load_plants_config, save_plants_config, setup_logging
 
 # Initialize logging
@@ -35,6 +36,9 @@ class ApplicationSystem:
             
         # Set up input sensors
         GPIO.setup(GPIO_PINS['tank_sensor'], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        
+        # Init Database
+        self.db_manager = DatabaseManager()
         
         self.config_data = load_plants_config()
         self.active_cosecha = self.config_data.get("active_cosecha", "default")
@@ -71,6 +75,19 @@ class ApplicationSystem:
         
         # Every day, we verify if cycle phase needs to be updated
         schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule)
+        
+        # Every 15 minutes, save sensor data to DB
+        def log_sensors():
+            from Adafruit_DHT import DHT11, read_retry
+            h, t = read_retry(DHT11, GPIO_PINS["dht11_sensor"])
+            if t is not None and h is not None:
+                self.db_manager.save_measurement("temperature", t)
+                self.db_manager.save_measurement("humidity", h)
+                logger.info(f"Log: T={t}C, H={h}% saved to DB.")
+
+        schedule.every(15).minutes.do(log_sensors)
+        # Initial log on startup
+        threading.Timer(10, log_sensors).start()
         
         while True:
             try:

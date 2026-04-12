@@ -101,3 +101,10 @@ def set_configs():
     _system.schedule_manager.cycles = new_data.get("plants", {}).get("default", {}).get("cycles", {})
     _system.schedule_manager.refresh_schedule()
     return jsonify({"status": "success", "message": "Config updated"})
+
+@api.route('/history', methods=['GET'])
+def get_history():
+    sensor = request.args.get('sensor', 'temperature')
+    limit = request.args.get('limit', default=48, type=int) # 48 entries x 15 mins = 12 hours
+    history = _system.db_manager.get_history(sensor, limit)
+    return jsonify(history)

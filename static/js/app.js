@@ -1,12 +1,15 @@
-const app = {
     init() {
         this.cacheDOM();
         this.bindEvents();
         this.startClock();
         this.fetchStats();
+        this.initCharts();
         
         // Refresh stats every 10 seconds
-        setInterval(() => this.fetchStats(), 10000);
+        setInterval(() => {
+            this.fetchStats();
+            this.updateCharts();
+        }, 10000);
     },
 
     cacheDOM() {
@@ -15,6 +18,8 @@ const app = {
         this.timeEl = document.getElementById('current-time');
         this.toastEl = document.getElementById('toast');
         this.configEditor = document.getElementById('config-editor');
+        this.advancedModeContainer = document.getElementById('advanced-config');
+        this.cyclesList = document.getElementById('cycles-list');
     },
 
     bindEvents() {
@@ -30,10 +35,59 @@ const app = {
 
                 // Load config JSON if entering settings
                 if(target === 'settings') {
-                    this.loadConfig();
+                    this.loadConfigToForm();
+                }
+                
+                if(target === 'dashboard') {
+                    this.updateCharts();
                 }
             });
         });
+    },
+
+    initCharts() {
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+            },
+            plugins: { legend: { display: false } },
+            elements: { line: { tension: 0.4 }, point: { radius: 0 } }
+        };
+
+        this.tempChart = new Chart(document.getElementById('tempChart'), {
+            type: 'line',
+            data: { labels: [], datasets: [{ data: [], borderColor: '#f59e0b', borderWidth: 2, fill: true, backgroundColor: 'rgba(245,158,11,0.05)' }] },
+            options: chartOptions
+        });
+
+        this.humChart = new Chart(document.getElementById('humChart'), {
+            type: 'line',
+            data: { labels: [], datasets: [{ data: [], borderColor: '#3b82f6', borderWidth: 2, fill: true, backgroundColor: 'rgba(59,130,246,0.05)' }] },
+            options: chartOptions
+        });
+    },
+
+    async updateCharts() {
+        try {
+            const [tempRes, humRes] = await Promise.all([
+                fetch('/api/history?sensor=temperature&limit=50'),
+                fetch('/api/history?sensor=humidity&limit=50')
+            ]);
+            
+            const temps = await tempRes.json();
+            const hums = await humRes.json();
+
+            this.tempChart.data.labels = temps.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+            this.tempChart.data.datasets[0].data = temps.map(d => d.value);
+            this.tempChart.update('none');
+
+            this.humChart.data.labels = hums.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+            this.humChart.data.datasets[0].data = hums.map(d => d.value);
+            this.humChart.update('none');
+        } catch(e) { console.error("Chart update failed", e); }
     },
 
     startClock() {
@@ -143,14 +197,87 @@ const app = {
         }
     },
 
-    async loadConfig() {
+    async loadConfigToForm() {
         try {
             const res = await fetch('/api/configs');
             const data = await res.json();
+            
+            // Advanced raw editor update
             this.configEditor.value = JSON.stringify(data, null, 4);
-        } catch(e) {
-            console.error("Failed loading config", e);
-        }
+
+            // Basic Form Update
+            document.getElementById('cfg-cosecha-name').value = data.active_cosecha || 'default';
+            const plantData = data.plants?.default || {};
+            document.getElementById('cfg-start-date').value = plantData.start_date || '';
+
+            // Render Cycles
+            this.cyclesList.innerHTML = '';
+            const cycles = plantData.cycles || {};
+            Object.keys(cycles).forEach(name => {
+                this.addCycleField(name, cycles[name]);
+            });
+
+        } catch(e) { console.error("Failed loading config into form", e); }
+    },
+
+    addCycleField(name = '', config = {}) {
+        const id = 'cycle_' + Date.now();
+        const html = `
+            <div class="cycle-item" id="${id}">
+                <div class="input-group" style="margin-bottom:12px;">
+                    <label>Cycle Name</label>
+                    <input type="text" class="cyc-name" value="${name}" placeholder="e.g. vegetation">
+                </div>
+                <div class="cycle-grid">
+                    <div class="input-group"><label>Duration (days)</label><input type="number" class="cyc-duration" value="${config.duration_days || 7}"></div>
+                    <div class="input-group"><label>Start Hour (0-23)</label><input type="number" class="cyc-start" value="${config.initial_time || 8}"></div>
+                    <div class="input-group"><label>Light Hours</label><input type="number" class="cyc-hours" value="${config.total_hours || 18}"></div>
+                    <div class="input-group"><label>Extra Red</label>
+                        <select class="cyc-red">
+                            <option value="false" ${!config.extra_red ? 'selected' : ''}>No</option>
+                            <option value="true" ${config.extra_red ? 'selected' : ''}>Yes (All Day)</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn danger-sm" style="margin-top:12px;" onclick="document.getElementById('${id}').remove()">Remove Cycle</button>
+            </div>
+        `;
+        this.cyclesList.insertAdjacentHTML('beforeend', html);
+    },
+
+    async generateAndSaveConfig() {
+        const cosechaName = document.getElementById('cfg-cosecha-name').value;
+        const startDate = document.getElementById('cfg-start-date').value;
+        
+        const cycles = {};
+        document.querySelectorAll('.cycle-item').forEach(item => {
+            const name = item.querySelector('.cyc-name').value;
+            if(!name) return;
+            cycles[name] = {
+                duration_days: parseInt(item.querySelector('.cyc-duration').value),
+                initial_time: parseInt(item.querySelector('.cyc-start').value),
+                total_hours: parseInt(item.querySelector('.cyc-hours').value),
+                main_delay: 30, ultrablue_delay: 15, infrared_delay: 15, // Standard defaults
+                extra_red: item.querySelector('.cyc-red').value === 'true'
+            };
+        });
+
+        const newConfig = {
+            active_cosecha: cosechaName,
+            plants: { default: { name: cosechaName, start_date: startDate, cycles: cycles } }
+        };
+
+        this.configEditor.value = JSON.stringify(newConfig, null, 4);
+        await this.saveConfig();
+    },
+
+    toggleAdvancedMode() {
+        this.advancedModeContainer.classList.toggle('hidden');
+    },
+
+    async loadConfig() {
+        // ... (legacy kept for backup/direct call)
+        this.loadConfigToForm();
     },
 
     async saveConfig() {
@@ -163,14 +290,10 @@ const app = {
             });
             const data = await res.json();
             if(data.status === 'success') {
-                this.showToast("Configuration saved and reloaded!");
+                this.showToast("Configuration saved!");
                 this.fetchStats();
-            } else {
-                throw new Error(data.message);
-            }
-        } catch(e) {
-            this.showToast(`Invalid JSON or Save Failed: ${e.message}`, true);
-        }
+            } else { throw new Error(data.message); }
+        } catch(e) { this.showToast(`Error: ${e.message}`, true); }
     }
 };
 
