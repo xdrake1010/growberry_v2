@@ -176,7 +176,8 @@ body {
 
 .widget-info h3 { font-size: 14px; color: var(--text-muted); font-weight: 400; margin-bottom: 4px; }
 .widget-info p { font-size: 24px; font-weight: 700; }
-
+.dashboard-details {
+    display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 24px;
     margin-bottom: 24px;
@@ -184,14 +185,15 @@ body {
 
 .charts-row {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 24px;
     margin-bottom: 24px;
 }
 
 .chart-card {
     padding: 20px;
-    min-height: 300px;
+    min-height: 250px;
+    height: 250px;
 }
 
 .chart-card h3 {
