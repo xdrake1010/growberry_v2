@@ -58,6 +58,64 @@ class ScheduleManager:
                 self.irrigation_controller.control_irrigation(irrigation_timer=irrigation_timer, multiplier=multiplier)
 
         schedule.every().day.at(f'{irrigation_time:02d}:00').do(conditional_irrigation)
+        
+        # Immediate sync after setting up future events
+        self.sync_hardware_to_schedule(cycle)
+
+    def is_time_in_range(self, start_h, start_m, end_h, end_m, current_h, current_m):
+        start = start_h * 60 + start_m
+        end = end_h * 60 + end_m
+        now = current_h * 60 + current_m
+        
+        if start <= end:
+            return start <= now < end
+        else: # Range spans across midnight
+            return now >= start or now < end
+
+    def sync_hardware_to_schedule(self, cycle: dict) -> None:
+        """Determines what should be ON/OFF right now and applies it."""
+        now = datetime.now()
+        cur_h, cur_m = now.hour, now.minute
+        
+        initial_time = cycle.get("initial_time", 8)
+        total_hours = cycle.get("total_hours", 12)
+        off_time = (initial_time + total_hours) % 24
+        
+        main_delay = cycle.get("main_delay", 30)
+        ultrablue_delay = cycle.get("ultrablue_delay", 15)
+        infrared_delay = cycle.get("infrared_delay", 15)
+        extra_red = cycle.get("extra_red", False)
+
+        # 1. Infrared Logic
+        should_ir = False
+        if extra_red:
+            should_ir = self.is_time_in_range(initial_time, 0, off_time, 0, cur_h, cur_m)
+        else:
+            # ON at start
+            if self.is_time_in_range(initial_time, 0, initial_time, infrared_delay, cur_h, cur_m):
+                should_ir = True
+            # ON at end
+            elif self.is_time_in_range((off_time-1)%24, 60-infrared_delay, off_time, 0, cur_h, cur_m):
+                should_ir = True
+        
+        if should_ir:
+            self.led_controller.led_controls["infrared_on"]()
+        else:
+            self.led_controller.led_controls["infrared_off"]()
+
+        # 2. Ultrablue Logic
+        should_blue = self.is_time_in_range(initial_time, ultrablue_delay, (off_time-1)%24, 60-ultrablue_delay, cur_h, cur_m)
+        if should_blue:
+            self.led_controller.led_controls["ultrablue_on"]()
+        else:
+            self.led_controller.led_controls["ultrablue_off"]()
+
+        # 3. Main Logic
+        should_main = self.is_time_in_range(initial_time, main_delay, (off_time-1)%24, 60-main_delay, cur_h, cur_m)
+        if should_main:
+            self.led_controller.led_controls["main_on"]()
+        else:
+            self.led_controller.led_controls["main_off"]()
 
     def determine_current_cycle(self) -> Dict[str, Any]:
         """Calculates current cycle phase based on the start date."""
