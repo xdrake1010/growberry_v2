@@ -11,8 +11,10 @@ class ScheduleManager:
         self.led_controller = led_controller
         self.tank_controller = tank_controller
         self.irrigation_controller = irrigation_controller
-        
-        # Robust loading
+        self.reload_config(config_data)
+
+    def reload_config(self, config_data: dict):
+        """Reloads harvest plan and start date from the provided config data."""
         self.active_cosecha = config_data.get("active_cosecha", "default")
         plants = config_data.get("plants", {})
         
@@ -29,9 +31,11 @@ class ScheduleManager:
         try:
             self.start_date = datetime.strptime(self.start_date_str, "%Y-%m-%d")
         except:
+            logger.error(f"Invalid start date: {self.start_date_str}. Using today.")
             self.start_date = datetime.now()
             
-        self.cycles = self.plant_data.get("cycles", {})
+        self.cycles = self.plant_data.get("cycles", [])
+        logger.info(f"Schedule reloaded for: {self.active_cosecha} (Started: {self.start_date_str})")
 
     def apply_cycle_schedule(self, cycle: dict, days_elapsed: int = 0) -> None:
         """
