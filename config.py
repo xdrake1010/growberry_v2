@@ -37,7 +37,7 @@ def setup_logging():
     )
 
 def get_default_config():
-    """Returns the hardcoded default 'Standard Mix' harvest plan."""
+    """Returns the hardcoded default 'Standard Mix' harvest plan with 4 phases and gradual reduction."""
     return {
         "active_cosecha": "Standard_Mix",
         "plants": {
@@ -74,6 +74,24 @@ def get_default_config():
                         "infra_blue_full": true,
                         "tank_time": 4,
                         "watering_days": [0, 2, 4, 6],
+                        "multiplier": 1,
+                        "irrigation_start_time": "08:00",
+                        "irrigation_timer": 15,
+                        "target_volume_liters": 0.0
+                    },
+                    "pre_blooming": {
+                        "duration_days": 8,
+                        "initial_time": 8,
+                        "total_hours": 21,
+                        "target_total_hours": 13,
+                        "ultra_red_step_mins": 15,
+                        "infra_blue_step_mins": 15,
+                        "ultra_red_sunrise": true,
+                        "ultra_red_full": true,
+                        "infra_blue_sunrise": false,
+                        "infra_blue_full": false,
+                        "tank_time": 15,
+                        "watering_days": [0, 1, 3, 5, 6],
                         "multiplier": 1,
                         "irrigation_start_time": "08:00",
                         "irrigation_timer": 15,

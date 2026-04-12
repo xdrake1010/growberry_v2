@@ -33,13 +33,24 @@ class ScheduleManager:
             
         self.cycles = self.plant_data.get("cycles", {})
 
-    def apply_cycle_schedule(self, cycle: dict) -> None:
+    def apply_cycle_schedule(self, cycle: dict, days_elapsed: int = 0) -> None:
         """
         Applies a lighting and irrigation schedule based on the cycle config.
-        Supports independent step durations for Red and Blue lights.
+        Supports independent step durations and gradual light hour transitions.
         """
         initial_time = cycle.get("initial_time", 8)
-        total_hours = cycle.get("total_hours", 12)
+        start_hours = cycle.get("total_hours", 12)
+        target_hours = cycle.get("target_total_hours", None)
+        duration_days = cycle.get("duration_days", 1)
+        
+        # Calculate current hours if gradual transition is enabled
+        if target_hours is not None and duration_days > 1:
+            progress = min(days_elapsed / (duration_days - 1), 1.0) if duration_days > 1 else 1.0
+            total_hours = start_hours + (target_hours - start_hours) * progress
+            logger.info(f"Gradual Hours: {start_hours} -> {target_hours} (Day {days_elapsed}/{duration_days}). Current: {total_hours:.2f}h")
+        else:
+            total_hours = start_hours
+
         red_step = cycle.get("ultra_red_step_mins", 15)
         blue_step = cycle.get("infra_blue_step_mins", 15)
         
@@ -124,7 +135,7 @@ class ScheduleManager:
                 self.irrigation_controller.control_irrigation(irrigation_timer=irrigation_timer, multiplier=multiplier)
         schedule.every().day.at(irrigation_start).do(conditional_irrigation)
         
-        self.sync_hardware_to_schedule(cycle)
+        self.sync_hardware_to_schedule(cycle, days_elapsed)
 
     def is_time_in_range(self, start_h, start_m, end_h, end_m, cur_dt):
         now_total = cur_dt.hour * 60 + cur_dt.minute
@@ -134,11 +145,21 @@ class ScheduleManager:
             return start_total <= now_total < end_total
         return now_total >= start_total or now_total < end_total
 
-    def sync_hardware_to_schedule(self, cycle: dict) -> None:
+    def sync_hardware_to_schedule(self, cycle: dict, days_elapsed: int = 0) -> None:
         """Determines what should be ON/OFF right now and applies it."""
         now = datetime.now()
         initial_time = cycle.get("initial_time", 8)
-        total_hours = cycle.get("total_hours", 12)
+        
+        start_hours = cycle.get("total_hours", 12)
+        target_hours = cycle.get("target_total_hours", None)
+        duration_days = cycle.get("duration_days", 1)
+        
+        if target_hours is not None and duration_days > 1:
+            progress = min(days_elapsed / (duration_days - 1), 1.0) if duration_days > 1 else 1.0
+            total_hours = start_hours + (target_hours - start_hours) * progress
+        else:
+            total_hours = start_hours
+
         red_step = cycle.get("ultra_red_step_mins", 15)
         blue_step = cycle.get("infra_blue_step_mins", 15)
         
@@ -197,6 +218,7 @@ class ScheduleManager:
                     "start_date": cycle_start,
                     "end_date": cycle_end,
                     "days_elapsed": (current_date - cycle_start).days,
+                    "duration_days": duration, # Added for clarity
                     "days_remaining": (cycle_end - current_date).days
                 }
             cycle_start = cycle_end
@@ -206,7 +228,7 @@ class ScheduleManager:
     def refresh_schedule(self):
         info = self.determine_current_cycle()
         if info:
-            self.apply_cycle_schedule(info["cycle_config"])
+            self.apply_cycle_schedule(info["cycle_config"], info["days_elapsed"])
             return info
         return None
 
@@ -214,7 +236,18 @@ class ScheduleManager:
         info = self.determine_current_cycle()
         if not info:
              return {"status": "inactive", "total_days": (datetime.now() - self.start_date).days}
-             
+        
+        # Calculate current dynamic hours for display
+        start_h = info["cycle_config"].get("total_hours", 12)
+        target_h = info["cycle_config"].get("target_total_hours", None)
+        duration = info["duration_days"]
+        days_passed = info["days_elapsed"]
+        
+        current_h = start_h
+        if target_h is not None and duration > 1:
+            progress = min(days_passed / (duration - 1), 1.0) if duration > 1 else 1.0
+            current_h = start_h + (target_h - start_h) * progress
+
         res = {
              "status": "active",
              "total_days": (datetime.now() - self.start_date).days,
@@ -223,6 +256,7 @@ class ScheduleManager:
              "days_remaining": info["days_remaining"],
              "cycle_start_date": info["start_date"].isoformat(),
              "cycle_end_date": info["end_date"].isoformat(),
+             "current_light_hours": round(current_h, 2),
              "schedule": info["cycle_config"]
         }
         return res

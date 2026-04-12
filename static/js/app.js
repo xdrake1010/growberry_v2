@@ -183,7 +183,8 @@ const app = {
             const cycleEl = document.getElementById('val-cycle');
             if(data.cycle_info && data.cycle_info.status === 'active') {
                 const c = data.cycle_info;
-                cycleEl.textContent = c.current_cycle.toUpperCase();
+                const hoursTxt = c.current_light_hours ? ` (${c.current_light_hours}h)` : '';
+                cycleEl.textContent = `${c.current_cycle.toUpperCase()}${hoursTxt}`;
                 
                 document.getElementById('cyc-elapsed').textContent = c.days_elapsed;
                 document.getElementById('cyc-rem').textContent = c.days_remaining;
@@ -327,10 +328,11 @@ const app = {
                 <div class="cycle-grid">
                     <div class="input-group"><label>Duration (days)</label><input type="number" class="cyc-duration" value="${config.duration_days || 7}"></div>
                     <div class="input-group"><label>Start Hour (0-23)</label><input type="number" class="cyc-light-start" value="${config.initial_time || 8}"></div>
-                    <div class="input-group"><label>Total Light Hours</label><input type="number" class="cyc-hours" value="${config.total_hours || 18}"></div>
-                    
                     <div class="input-group"><label>Red Step (mins)</label><input type="number" class="cyc-red-step" value="${config.ultra_red_step_mins || 15}"></div>
                     <div class="input-group"><label>Blue Step (mins)</label><input type="number" class="cyc-blue-step" value="${config.infra_blue_step_mins || 15}"></div>
+                    
+                    <div class="input-group"><label>Start Hours</label><input type="number" class="cyc-hours" value="${config.total_hours || 18}"></div>
+                    <div class="input-group"><label>Target Hours (End)</label><input type="number" class="cyc-target-hours" value="${config.target_total_hours || config.total_hours || 18}"></div>
                     
                     <div class="input-group"><label>Irrigation Time</label><input type="time" class="cyc-irr-start" value="${config.irrigation_start_time || '08:00'}"></div>
                     <div class="input-group"><label>Irrigation Secs</label><input type="number" class="cyc-irr-timer" value="${config.irrigation_timer || 15}"></div>
@@ -395,6 +397,7 @@ const app = {
                 duration_days: parseInt(item.querySelector('.cyc-duration').value),
                 initial_time: parseInt(item.querySelector('.cyc-light-start').value),
                 total_hours: parseInt(item.querySelector('.cyc-hours').value),
+                target_total_hours: parseInt(item.querySelector('.cyc-target-hours').value),
                 
                 ultra_red_step_mins: parseInt(item.querySelector('.cyc-red-step').value),
                 infra_blue_step_mins: parseInt(item.querySelector('.cyc-blue-step').value),
