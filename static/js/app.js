@@ -262,6 +262,13 @@ const app = {
 
     addCycleField(name = '', config = {}) {
         const id = 'cycle_' + Date.now();
+        // Support legacy mapping if profiles exist
+        let rs = config.ultra_red_sunrise, rf = config.ultra_red_full;
+        let bs = config.infra_blue_sunrise, bf = config.infra_blue_full;
+        
+        if (config.logic_profile === 'vegetation') { rs=true; rf=false; bs=true; bf=true; }
+        if (config.logic_profile === 'blooming') { rs=true; rf=true; bs=false; bf=false; }
+
         const html = `
             <div class="cycle-item" id="${id}">
                 <div class="input-group" style="margin-bottom:12px;">
@@ -272,17 +279,26 @@ const app = {
                     <div class="input-group"><label>Duration (days)</label><input type="number" class="cyc-duration" value="${config.duration_days || 7}"></div>
                     <div class="input-group"><label>Start Hour (0-23)</label><input type="number" class="cyc-light-start" value="${config.initial_time || 8}"></div>
                     <div class="input-group"><label>Total Light Hours</label><input type="number" class="cyc-hours" value="${config.total_hours || 18}"></div>
-                    <div class="input-group"><label>Logic Profile</label>
-                        <select class="cyc-profile">
-                            <option value="vegetation" ${config.logic_profile === 'vegetation' ? 'selected' : ''}>Vegetation (With Blue)</option>
-                            <option value="blooming" ${config.logic_profile === 'blooming' ? 'selected' : ''}>Blooming (Red+Main)</option>
-                        </select>
-                    </div>
                     <div class="input-group"><label>Step Duration (mins)</label><input type="number" class="cyc-step" value="${config.sunrise_step_mins || 15}"></div>
+                    
                     <div class="input-group"><label>Irrigation Time</label><input type="time" class="cyc-irr-start" value="${config.irrigation_start_time || '08:00'}"></div>
                     <div class="input-group"><label>Irrigation Secs</label><input type="number" class="cyc-irr-timer" value="${config.irrigation_timer || 15}"></div>
                     <div class="input-group"><label>Target Volume (L)</label><input type="number" step="0.1" class="cyc-volume" value="${config.target_volume_liters || 0}"></div>
                 </div>
+
+                <div class="lighting-flags" style="margin-top:10px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="flag-col">
+                        <label style="display:block; font-size: 0.8em; font-weight:600; margin-bottom:5px;">Ultra Red (Red)</label>
+                        <label class="check-label"><input type="checkbox" class="cyc-rs" ${rs ? 'checked' : ''}> Sunrise/Sunset</label>
+                        <label class="check-label"><input type="checkbox" class="cyc-rf" ${rf ? 'checked' : ''}> Full Cycle</label>
+                    </div>
+                    <div class="flag-col">
+                        <label style="display:block; font-size: 0.8em; font-weight:600; margin-bottom:5px;">Infra Blue (Blue)</label>
+                        <label class="check-label"><input type="checkbox" class="cyc-bs" ${bs ? 'checked' : ''}> Sunrise/Sunset</label>
+                        <label class="check-label"><input type="checkbox" class="cyc-bf" ${bf ? 'checked' : ''}> Full Cycle</label>
+                    </div>
+                </div>
+
                 <div class="watering-days-selector" style="margin-top:10px;">
                     <label style="display:block; font-size: 0.8em; margin-bottom:5px;">Watering Days</label>
                     <div style="display:flex; gap: 8px; flex-wrap: wrap;">
@@ -328,8 +344,13 @@ const app = {
                 duration_days: parseInt(item.querySelector('.cyc-duration').value),
                 initial_time: parseInt(item.querySelector('.cyc-light-start').value),
                 total_hours: parseInt(item.querySelector('.cyc-hours').value),
-                logic_profile: item.querySelector('.cyc-profile').value,
                 sunrise_step_mins: parseInt(item.querySelector('.cyc-step').value),
+                
+                ultra_red_sunrise: item.querySelector('.cyc-rs').checked,
+                ultra_red_full: item.querySelector('.cyc-rf').checked,
+                infra_blue_sunrise: item.querySelector('.cyc-bs').checked,
+                infra_blue_full: item.querySelector('.cyc-bf').checked,
+                
                 irrigation_start_time: item.querySelector('.cyc-irr-start').value,
                 irrigation_timer: parseInt(item.querySelector('.cyc-irr-timer').value),
                 target_volume_liters: parseFloat(item.querySelector('.cyc-volume').value),

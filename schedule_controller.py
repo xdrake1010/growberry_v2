@@ -36,12 +36,17 @@ class ScheduleManager:
     def apply_cycle_schedule(self, cycle: dict) -> None:
         """
         Applies a lighting and irrigation schedule based on the cycle config.
-        Supports 'vegetation' and 'blooming' profiles.
+        Supports granular flags for sunrise/sunset and full cycle behavior.
         """
         initial_time = cycle.get("initial_time", 8)
         total_hours = cycle.get("total_hours", 12)
-        profile = cycle.get("logic_profile", "vegetation")
         step_mins = cycle.get("sunrise_step_mins", 15)
+        
+        # Granular Flags
+        red_sunrise = cycle.get("ultra_red_sunrise", False)
+        red_full = cycle.get("ultra_red_full", False)
+        blue_sunrise = cycle.get("infra_blue_sunrise", False)
+        blue_full = cycle.get("infra_blue_full", False)
         
         # Irrigation
         watering_days = cycle.get("watering_days", list(range(7)))
@@ -55,139 +60,115 @@ class ScheduleManager:
         schedule.clear()
         
         # --- Lighting Logic ---
-        # Start Time (T=0)
         start_dt = datetime.strptime(f"{initial_time:02d}:00", "%H:%M")
-        
-        # Sequential timestamps
         t0 = start_dt.strftime("%H:%M")
         t1 = (start_dt + timedelta(minutes=step_mins)).strftime("%H:%M")
         t2 = (start_dt + timedelta(minutes=step_mins*2)).strftime("%H:%M")
         
-        # Total duration ends at T_start + total_hours
         end_dt = start_dt + timedelta(hours=total_hours)
-        
-        # End sequence timestamps
         e0 = (end_dt - timedelta(minutes=step_mins*2)).strftime("%H:%M")
         e1 = (end_dt - timedelta(minutes=step_mins)).strftime("%H:%M")
         e2 = end_dt.strftime("%H:%M")
 
-        if profile == "vegetation":
-            # Sunrise: Red -> Blue -> Main (Overlap with Red)
+        # Start Sequence
+        if red_sunrise:
             schedule.every().day.at(t0).do(self.led_controller.led_controls["infrared_on"])
+        elif red_full:
+            schedule.every().day.at(t2).do(self.led_controller.led_controls["infrared_on"])
+
+        if blue_sunrise:
             schedule.every().day.at(t1).do(self.led_controller.led_controls["ultrablue_on"])
-            
-            def main_on_with_overlap():
-                self.led_controller.led_controls["main_on"]()
-                time.sleep(1) # 1s overlap
+        elif blue_full:
+            schedule.every().day.at(t2).do(self.led_controller.led_controls["ultrablue_on"])
+
+        def main_on_with_overlap():
+            self.led_controller.led_controls["main_on"]()
+            time.sleep(1)
+            if red_sunrise and not red_full:
                 self.led_controller.led_controls["infrared_off"]()
-            
-            schedule.every().day.at(t2).do(main_on_with_overlap)
-            
-            # Sunset: Main OFF (Red ON) -> Blue OFF -> Red OFF
-            def main_off_with_overlap():
+            if blue_sunrise and not blue_full:
+                self.led_controller.led_controls["ultrablue_off"]()
+        
+        schedule.every().day.at(t2).do(main_on_with_overlap)
+        
+        # End Sequence
+        def main_off_with_overlap():
+            if red_sunrise and not red_full:
                 self.led_controller.led_controls["infrared_on"]()
-                time.sleep(1) # 1s overlap
-                self.led_controller.led_controls["main_off"]()
+            if blue_sunrise and not blue_full:
+                self.led_controller.led_controls["ultrablue_on"]()
+            time.sleep(1)
+            self.led_controller.led_controls["main_off"]()
+            if not red_full and not red_sunrise: # In case it was somehow ON
+                 self.led_controller.led_controls["infrared_off"]()
+            if not blue_full and not blue_sunrise:
+                 self.led_controller.led_controls["ultrablue_off"]()
                 
-            schedule.every().day.at(e0).do(main_off_with_overlap)
+        schedule.every().day.at(e0).do(main_off_with_overlap)
+        
+        if blue_sunrise:
             schedule.every().day.at(e1).do(self.led_controller.led_controls["ultrablue_off"])
+        elif blue_full:
+            schedule.every().day.at(e2).do(self.led_controller.led_controls["ultrablue_off"])
+
+        if red_sunrise or red_full:
             schedule.every().day.at(e2).do(self.led_controller.led_controls["infrared_off"])
 
-        else: # Blooming Profile
-            # Sunrise: Red -> Main (Both stay ON)
-            schedule.every().day.at(t0).do(self.led_controller.led_controls["infrared_on"])
-            schedule.every().day.at(t1).do(self.led_controller.led_controls["main_on"])
-            
-            # Sunset: Main OFF -> Red OFF
-            schedule.every().day.at(e1).do(self.led_controller.led_controls["main_off"])
-            schedule.every().day.at(e2).do(self.led_controller.led_controls["infrared_off"])
-            
-            # Ensure Blue is OFF in Blooming
-            schedule.every().day.at(t0).do(self.led_controller.led_controls["ultrablue_off"])
-
-        # --- Tank Setup ---
+        # --- Tank & Irrigation ---
         schedule.every().day.at(f"{tank_time:02d}:00").do(self.tank_controller.control_tank)
-
-        # --- Irrigation Execution ---
         def conditional_irrigation():
             today = datetime.now().weekday()
             if today in watering_days:
                 logger.info("Triggering scheduled irrigation...")
                 self.irrigation_controller.control_irrigation(irrigation_timer=irrigation_timer, multiplier=multiplier)
-
         schedule.every().day.at(irrigation_start).do(conditional_irrigation)
         
-        # Immediate sync
         self.sync_hardware_to_schedule(cycle)
 
     def is_time_in_range(self, start_h, start_m, end_h, end_m, cur_dt):
         now_total = cur_dt.hour * 60 + cur_dt.minute
         start_total = start_h * 60 + start_m
         end_total = end_h * 60 + end_m
-        
         if start_total <= end_total:
             return start_total <= now_total < end_total
-        else: # Spans midnight
-            return now_total >= start_total or now_total < end_total
+        return now_total >= start_total or now_total < end_total
 
     def sync_hardware_to_schedule(self, cycle: dict) -> None:
         """Determines what should be ON/OFF right now and applies it."""
         now = datetime.now()
-        cur_h, cur_m = now.hour, now.minute
-        
         initial_time = cycle.get("initial_time", 8)
         total_hours = cycle.get("total_hours", 12)
-        profile = cycle.get("logic_profile", "vegetation")
         step_mins = cycle.get("sunrise_step_mins", 15)
+        
+        red_sunrise = cycle.get("ultra_red_sunrise", False)
+        red_full = cycle.get("ultra_red_full", False)
+        blue_sunrise = cycle.get("infra_blue_sunrise", False)
+        blue_full = cycle.get("infra_blue_full", False)
 
         start_dt = datetime.strptime(f"{initial_time:02d}:00", "%H:%M")
-        end_dt = start_dt + timedelta(hours=total_hours)
-
-        # Step durations in minutes from start
-        steps = {
-            "t0": 0,
-            "t1": step_mins,
-            "t2": step_mins * 2,
-            "e0": (total_hours * 60) - (step_mins * 2),
-            "e1": (total_hours * 60) - step_mins,
-            "e2": total_hours * 60
-        }
-
-        def get_time_at_step(step_name):
-            dt = start_dt + timedelta(minutes=steps[step_name])
+        def get_t(m):
+            dt = start_dt + timedelta(minutes=m)
             return dt.hour, dt.minute
 
-        # Current state determination
+        t0, t1, t2 = 0, step_mins, step_mins * 2
+        e0, e1, e2 = (total_hours * 60) - (step_mins * 2), (total_hours * 60) - step_mins, total_hours * 60
+
         should_red = False
         should_blue = False
-        should_main = False
+        should_main = self.is_time_in_range(*get_t(t2), *get_t(e0), now)
 
-        if profile == "vegetation":
-            # Red: ON [t0-t2] and [e0-e2]
-            if self.is_time_in_range(*get_time_at_step("t0"), *get_time_at_step("t2"), now) or \
-               self.is_time_in_range(*get_time_at_step("e0"), *get_time_at_step("e2"), now):
-                should_red = True
-            
-            # Blue: ON [t1-e1]
-            if self.is_time_in_range(*get_time_at_step("t1"), *get_time_at_step("e1"), now):
-                should_blue = True
-                
-            # Main: ON [t2-e0]
-            if self.is_time_in_range(*get_time_at_step("t2"), *get_time_at_step("e0"), now):
-                should_main = True
-        else:
-            # Blooming
-            # Red: ON [t0-e2]
-            if self.is_time_in_range(*get_time_at_step("t0"), *get_time_at_step("e2"), now):
-                should_red = True
-            
-            # Main: ON [t1-e1]
-            if self.is_time_in_range(*get_time_at_step("t1"), *get_time_at_step("e1"), now):
-                should_main = True
-            
-            should_blue = False
+        # Red Logic
+        if red_sunrise and (self.is_time_in_range(*get_t(t0), *get_t(t2), now) or self.is_time_in_range(*get_t(e0), *get_t(e2), now)):
+            should_red = True
+        if red_full and self.is_time_in_range(*get_t(t2), *get_t(e0), now):
+            should_red = True
 
-        # Apply states
+        # Blue Logic
+        if blue_sunrise and (self.is_time_in_range(*get_t(t1), *get_t(t2), now) or self.is_time_in_range(*get_t(e0), *get_t(e1), now)):
+            should_blue = True
+        if blue_full and self.is_time_in_range(*get_t(t2), *get_t(e0), now):
+            should_blue = True
+
         if should_red: self.led_controller.led_controls["infrared_on"]()
         else: self.led_controller.led_controls["infrared_off"]()
         
