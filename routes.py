@@ -19,7 +19,11 @@ def video_feed():
 @api.route('/statistics', methods=['GET'])
 def get_statistics():
     try:
-        humidity, temperature = read_retry(DHT11, GPIO_PINS["dht11_sensor"])
+        # Using Cached Sensor Data to keep CPU load low on Pi Zero
+        temperature = _system.sensor_data["temperature"]
+        humidity = _system.sensor_data["humidity"]
+        last_update = _system.sensor_data["last_update"]
+        
         cycle_info = _system.schedule_manager.get_cycle_info()
         led_info = _system.led_controller.get_all_states()
         ventilation_state = _system.ventilation_controller.get_state()
@@ -29,6 +33,7 @@ def get_statistics():
         return jsonify({
             "temperature": temperature,
             "humidity": humidity,
+            "last_update": last_update,
             "ventilation": ventilation_state,
             "tank": tank_state,
             "irrigation": irrigation_state,

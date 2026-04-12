@@ -62,6 +62,9 @@ class ApplicationSystem:
         )
         self.camera_controller = CameraController(cosecha_name=self.active_cosecha)
         
+        # Sensor Cache
+        self.sensor_data = {"temperature": None, "humidity": None, "last_update": None}
+        
         self.lock = threading.Lock()
         logger.info("System Initialized Successfully.")
         
@@ -88,6 +91,24 @@ class ApplicationSystem:
         schedule.every(15).minutes.do(log_sensors)
         # Initial log on startup
         threading.Timer(10, log_sensors).start()
+        
+        # New: Continuous cache update every 30 seconds
+        def update_cache_loop():
+            from Adafruit_DHT import DHT11, read_retry
+            while True:
+                try:
+                    h, t = read_retry(DHT11, GPIO_PINS["dht11_sensor"])
+                    if t is not None and h is not None:
+                        with self.lock:
+                            self.sensor_data["temperature"] = t
+                            self.sensor_data["humidity"] = h
+                            self.sensor_data["last_update"] = datetime.now().isoformat()
+                except Exception as e:
+                    logger.error(f"Error updating sensor cache: {e}")
+                time.sleep(30) # Read every 30 seconds
+
+        cache_thread = threading.Thread(target=update_cache_loop, daemon=True)
+        cache_thread.start()
         
         while True:
             try:

@@ -6,11 +6,13 @@ const app = {
         this.fetchStats();
         this.initCharts();
         
-        // Refresh stats every 10 seconds
+        this.initCharts();
+        
+        // Refresh stats and charts every 30 seconds (matches sensor cache)
         setInterval(() => {
             this.fetchStats();
             this.updateCharts();
-        }, 10000);
+        }, 30000);
     },
 
     cacheDOM() {
@@ -79,16 +81,19 @@ const app = {
                 fetch('/api/history?sensor=humidity&limit=50')
             ]);
             
-            const temps = await tempRes.json();
-            const hums = await humRes.json();
+            if (tempRes.ok) {
+                const temps = await tempRes.json();
+                this.tempChart.data.labels = temps.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                this.tempChart.data.datasets[0].data = temps.map(d => d.value);
+                this.tempChart.update('none');
+            }
 
-            this.tempChart.data.labels = temps.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-            this.tempChart.data.datasets[0].data = temps.map(d => d.value);
-            this.tempChart.update('none');
-
-            this.humChart.data.labels = hums.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
-            this.humChart.data.datasets[0].data = hums.map(d => d.value);
-            this.humChart.update('none');
+            if (humRes.ok) {
+                const hums = await humRes.json();
+                this.humChart.data.labels = hums.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                this.humChart.data.datasets[0].data = hums.map(d => d.value);
+                this.humChart.update('none');
+            }
         } catch(e) { console.error("Chart update failed", e); }
     },
 

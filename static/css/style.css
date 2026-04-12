@@ -192,8 +192,14 @@ body {
 
 .chart-card {
     padding: 20px;
-    min-height: 250px;
-    height: 250px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card canvas {
+    width: 100% !important;
+    max-height: 180px;
 }
 
 .chart-card h3 {
