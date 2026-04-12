@@ -1,0 +1,6 @@
+Flask
+Flask-CORS
+schedule
+Adafruit_DHT
+RPi.GPIO
+opencv-python-headless

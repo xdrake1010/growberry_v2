@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Growberry - Intelligent Cultivation</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar glass-panel">
+            <div class="logo">
+                <i class="fa-solid fa-leaf"></i>
+                <span>Growberry</span>
+            </div>
+            <ul class="nav-links">
+                <li class="active" data-tab="dashboard"><i class="fa-solid fa-chart-pie"></i> Dashboard</li>
+                <li data-tab="camera"><i class="fa-solid fa-camera"></i> Camera Feed</li>
+                <li data-tab="controls"><i class="fa-solid fa-sliders"></i> Manual Controls</li>
+                <li data-tab="timelapse"><i class="fa-solid fa-film"></i> Timelapse</li>
+                <li data-tab="settings"><i class="fa-solid fa-gear"></i> Settings</li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header glass-panel">
+                <div class="status-indicator">
+                    <div class="dot active"></div> System Online
+                </div>
+                <div class="current-date" id="current-time">--:--:--</div>
+            </header>
+
+            <div class="view-container">
+                <!-- Dashboard Tab -->
+                <section id="dashboard" class="tab-content active">
+                    <div class="widget-grid">
+                        <div class="widget glass-panel">
+                            <div class="widget-icon temp"><i class="fa-solid fa-temperature-half"></i></div>
+                            <div class="widget-info">
+                                <h3>Temperature</h3>
+                                <p id="val-temp">--°C</p>
+                            </div>
+                        </div>
+                        <div class="widget glass-panel">
+                            <div class="widget-icon hum"><i class="fa-solid fa-droplet"></i></div>
+                            <div class="widget-info">
+                                <h3>Humidity</h3>
+                                <p id="val-hum">--%</p>
+                            </div>
+                        </div>
+                        <div class="widget glass-panel">
+                            <div class="widget-icon cycle"><i class="fa-solid fa-seedling"></i></div>
+                            <div class="widget-info">
+                                <h3>Current Cycle</h3>
+                                <p id="val-cycle">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-details">
+                        <div class="glass-panel detail-card">
+                            <h3>Hardware States</h3>
+                            <ul class="state-list">
+                                <li><span>Main LED</span> <span id="st-main-led" class="badge">--</span></li>
+                                <li><span>Infrared LED</span> <span id="st-ir-led" class="badge">--</span></li>
+                                <li><span>Ultrablue LED</span> <span id="st-ub-led" class="badge">--</span></li>
+                                <li><span>Ventilation</span> <span id="st-vent" class="badge">--</span></li>
+                                <li><span>Tank Charge</span> <span id="st-tank" class="badge">--</span></li>
+                                <li><span>Irrigation</span> <span id="st-irr" class="badge">--</span></li>
+                            </ul>
+                        </div>
+                        <div class="glass-panel detail-card">
+                            <h3>Cycle Progress</h3>
+                            <div class="progress-wrap">
+                                <p>Days Elapsed: <span id="cyc-elapsed">0</span> / Remaining: <span id="cyc-rem">0</span></p>
+                                <div class="progress-bar"><div class="fill" id="cyc-progress"></div></div>
+                            </div>
+                            <div class="eta">
+                                <p>Started: <span id="cyc-start">--</span></p>
+                                <p>Ends: <span id="cyc-end">--</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Camera Tab -->
+                <section id="camera" class="tab-content">
+                    <div class="glass-panel video-container">
+                        <h2>Live Feed</h2>
+                        <div class="feed-wrapper">
+                            <img id="live-video" src="/api/video_feed" alt="Camera Live Feed" onerror="this.onerror=null; this.src='/placeholder-camera.jpg'; this.alt='Feed Unavailable';"/>
+                        </div>
+                        <div class="camera-actions">
+                            <button class="btn primary" onclick="app.captureFrame()"><i class="fa-solid fa-camera"></i> Manual Capture</button>
+                            <button class="btn secondary" onclick="app.reloadFeed()"><i class="fa-solid fa-rotate"></i> Reload Stream</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Controls Tab -->
+                <section id="controls" class="tab-content">
+                    <div class="glass-panel controls-grid">
+                        <h2>Manual Overrides</h2>
+                        <div class="control-group">
+                            <label>Main LED</label>
+                            <div class="toggle-btns">
+                                <button class="btn on" onclick="app.toggleAction('led', 'main', 'on')">ON</button>
+                                <button class="btn off" onclick="app.toggleAction('led', 'main', 'off')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label>Infrared</label>
+                            <div class="toggle-btns">
+                                <button class="btn on" onclick="app.toggleAction('led', 'infrared', 'on')">ON</button>
+                                <button class="btn off" onclick="app.toggleAction('led', 'infrared', 'off')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label>Ultrablue</label>
+                            <div class="toggle-btns">
+                                <button class="btn on" onclick="app.toggleAction('led', 'ultrablue', 'on')">ON</button>
+                                <button class="btn off" onclick="app.toggleAction('led', 'ultrablue', 'off')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label>Ventilation</label>
+                            <div class="toggle-btns">
+                                <button class="btn on" onclick="app.toggleAction('ventilation', null, 'on')">ON</button>
+                                <button class="btn off" onclick="app.toggleAction('ventilation', null, 'off')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label>Tank Filling</label>
+                            <div class="toggle-btns">
+                                <button class="btn on" onclick="app.toggleAction('tank', null, 'on')">ON</button>
+                                <button class="btn off" onclick="app.toggleAction('tank', null, 'off')">OFF</button>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <label>Irrigate Now</label>
+                            <div class="toggle-btns">
+                                <button class="btn on" onclick="app.toggleAction('irrigation', null, 'on')">ON</button>
+                                <button class="btn off" onclick="app.toggleAction('irrigation', null, 'off')">OFF</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Settings & Configs Tab -->
+                <section id="settings" class="tab-content">
+                    <div class="glass-panel">
+                        <h2>Plant Configuration (JSON)</h2>
+                        <p class="subtitle">Modify the JSON definitions of your harvest and cycles below.</p>
+                        <textarea id="config-editor" class="code-editor" rows="20"></textarea>
+                        <div class="actions">
+                            <button class="btn primary" onclick="app.saveConfig()">Save & Reload System</button>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Timelapse Tab -->
+                <section id="timelapse" class="tab-content">
+                    <div class="glass-panel">
+                        <h2>Timelapse Viewer</h2>
+                        <p>Timelapse images are automatically captured and saved to the configured directory in the Raspberry Pi filesystem.</p>
+                        <hr style="opacity:0.2; margin: 20px 0;">
+                        <button class="btn primary" onclick="app.captureFrame()">Force Capture Frame Now</button>
+                        <p style="margin-top:20px; font-size: 0.9em; opacity: 0.8;">Directory: <code>/home/growberry/timelapse/</code></p>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Action applied successfully</div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
