@@ -11,7 +11,7 @@ class ScheduleManager:
         self.irrigation_controller = irrigation_controller
         
         self.active_cosecha = config_data.get("active_cosecha", "default")
-        self.plant_data = config_data.get("plants", {}).get("default", {}) # We default to standard if not found
+        self.plant_data = config_data.get("plants", {}).get(self.active_cosecha, {}) 
         
         self.start_date_str = self.plant_data.get("start_date", datetime.now().strftime("%Y-%m-%d"))
         self.start_date = datetime.strptime(self.start_date_str, "%Y-%m-%d")

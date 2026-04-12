@@ -21,6 +21,7 @@ const app = {
         this.configEditor = document.getElementById('config-editor');
         this.advancedModeContainer = document.getElementById('advanced-config');
         this.cyclesList = document.getElementById('cycles-list');
+        this.harvestSelector = document.getElementById('cfg-load-selector');
     },
 
     bindEvents() {
@@ -202,23 +203,50 @@ const app = {
         try {
             const res = await fetch('/api/configs');
             const data = await res.json();
+            this.fullConfig = data; // Cache full config for saving
             
             // Advanced raw editor update
             this.configEditor.value = JSON.stringify(data, null, 4);
 
-            // Basic Form Update
-            document.getElementById('cfg-cosecha-name').value = data.active_cosecha || 'default';
-            const plantData = data.plants?.default || {};
-            document.getElementById('cfg-start-date').value = plantData.start_date || '';
-
-            // Render Cycles
-            this.cyclesList.innerHTML = '';
-            const cycles = plantData.cycles || {};
-            Object.keys(cycles).forEach(name => {
-                this.addCycleField(name, cycles[name]);
+            // Populate Selector
+            this.harvestSelector.innerHTML = '<option value="">-- Create New / Select --</option>';
+            const plants = data.plants || {};
+            Object.keys(plants).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                if(name === data.active_cosecha) opt.selected = true;
+                this.harvestSelector.appendChild(opt);
             });
 
+            this.renderHarvestData(data.active_cosecha || 'default');
+
         } catch(e) { console.error("Failed loading config into form", e); }
+    },
+
+    loadSelectedHarvest() {
+        const name = this.harvestSelector.value;
+        if(!name) {
+            // Reset form for "New"
+            document.getElementById('cfg-cosecha-name').value = '';
+            document.getElementById('cfg-start-date').value = '';
+            this.cyclesList.innerHTML = '';
+            return;
+        }
+        this.renderHarvestData(name);
+    },
+
+    renderHarvestData(cosechaName) {
+        const plantData = this.fullConfig?.plants?.[cosechaName] || {};
+        document.getElementById('cfg-cosecha-name').value = cosechaName;
+        document.getElementById('cfg-start-date').value = plantData.start_date || '';
+
+        // Render Cycles
+        this.cyclesList.innerHTML = '';
+        const cycles = plantData.cycles || {};
+        Object.keys(cycles).forEach(name => {
+            this.addCycleField(name, cycles[name]);
+        });
     },
 
     addCycleField(name = '', config = {}) {
@@ -250,6 +278,11 @@ const app = {
         const cosechaName = document.getElementById('cfg-cosecha-name').value;
         const startDate = document.getElementById('cfg-start-date').value;
         
+        if(!cosechaName) {
+            this.showToast("Please provide a name for the Cosecha", true);
+            return;
+        }
+
         const cycles = {};
         document.querySelectorAll('.cycle-item').forEach(item => {
             const name = item.querySelector('.cyc-name').value;
@@ -258,18 +291,24 @@ const app = {
                 duration_days: parseInt(item.querySelector('.cyc-duration').value),
                 initial_time: parseInt(item.querySelector('.cyc-start').value),
                 total_hours: parseInt(item.querySelector('.cyc-hours').value),
-                main_delay: 30, ultrablue_delay: 15, infrared_delay: 15, // Standard defaults
+                main_delay: 30, ultrablue_delay: 15, infrared_delay: 15,
                 extra_red: item.querySelector('.cyc-red').value === 'true'
             };
         });
 
-        const newConfig = {
-            active_cosecha: cosechaName,
-            plants: { default: { name: cosechaName, start_date: startDate, cycles: cycles } }
+        // Ensure we preserve other plants
+        if(!this.fullConfig.plants) this.fullConfig.plants = {};
+        
+        this.fullConfig.active_cosecha = cosechaName;
+        this.fullConfig.plants[cosechaName] = { 
+            name: cosechaName, 
+            start_date: startDate, 
+            cycles: cycles 
         };
 
-        this.configEditor.value = JSON.stringify(newConfig, null, 4);
+        this.configEditor.value = JSON.stringify(this.fullConfig, null, 4);
         await this.saveConfig();
+        this.loadConfigToForm(); // Update selector list
     },
 
     toggleAdvancedMode() {

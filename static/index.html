@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌿</text></svg>">
 </head>
 <body>
     <div class="app-container">
@@ -169,6 +170,13 @@
                         <p class="subtitle">Visually manage your cultivation cycles and parameters.</p>
                         
                         <div class="config-form">
+                            <div class="input-group">
+                                <label>Load Saved Harvest</label>
+                                <select id="cfg-load-selector" onchange="app.loadSelectedHarvest()">
+                                    <option value="">-- Create New / Select --</option>
+                                </select>
+                            </div>
+                            <hr style="opacity:0.1; margin:10px 0;">
                             <div class="input-group">
                                 <label>Active Cosecha Name</label>
                                 <input type="text" id="cfg-cosecha-name" placeholder="e.g. Tomato_Batch_1">
