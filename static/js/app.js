@@ -2,10 +2,9 @@ const app = {
     init() {
         this.cacheDOM();
         this.bindEvents();
+        this.initMobileMenu();
         this.startClock();
         this.fetchStats();
-        this.initCharts();
-        
         this.initCharts();
         
         // Refresh stats and charts every 30 seconds (matches sensor cache)
@@ -13,6 +12,30 @@ const app = {
             this.fetchStats();
             this.updateCharts();
         }, 30000);
+    },
+
+    initMobileMenu() {
+        const toggle = document.getElementById('mobile-toggle');
+        const sidebar = document.querySelector('.sidebar');
+        if (toggle && sidebar) {
+            toggle.addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+                const icon = toggle.querySelector('i');
+                if (sidebar.classList.contains('open')) {
+                    icon.classList.replace('fa-bars', 'fa-xmark');
+                } else {
+                    icon.classList.replace('fa-xmark', 'fa-bars');
+                }
+            });
+            
+            // Close menu when a link is clicked
+            document.querySelectorAll('.nav-links li').forEach(li => {
+                li.addEventListener('click', () => {
+                    sidebar.classList.remove('open');
+                    toggle.querySelector('i').classList.replace('fa-xmark', 'fa-bars');
+                });
+            });
+        }
     },
 
     cacheDOM() {
