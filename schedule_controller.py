@@ -202,12 +202,15 @@ class ScheduleManager:
         else: self.led_controller.led_controls["main_off"]()
 
     def determine_current_cycle(self) -> Dict[str, Any]:
-        """Calculates current cycle phase based on the start date."""
+        """Calculates current cycle phase based on an ordered list of cycles."""
         current_date = datetime.now()
-        
         cycle_start = self.start_date
         
-        for cycle_name, cycle_config in self.cycles.items():
+        # self.cycles is now a LIST: [{"name": "seeding", ...}, {"name": "vegetation", ...}]
+        cycles_list = self.cycles if isinstance(self.cycles, list) else []
+        
+        for cycle_config in cycles_list:
+            cycle_name = cycle_config.get("name", "unknown")
             duration = cycle_config.get("duration_days", 1)
             cycle_end = cycle_start + timedelta(days=duration)
             
@@ -218,7 +221,7 @@ class ScheduleManager:
                     "start_date": cycle_start,
                     "end_date": cycle_end,
                     "days_elapsed": (current_date - cycle_start).days,
-                    "duration_days": duration, # Added for clarity
+                    "duration_days": duration,
                     "days_remaining": (cycle_end - current_date).days
                 }
             cycle_start = cycle_end

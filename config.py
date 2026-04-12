@@ -37,18 +37,20 @@ def setup_logging():
     )
 
 def get_default_config():
-    """Returns the hardcoded default 'Standard Mix' harvest plan with 4 phases and gradual reduction."""
+    """Returns the hardcoded default 'Standard Mix' harvest plan with 4 phases and gradual reduction (List format)."""
     return {
         "active_cosecha": "Standard_Mix",
         "plants": {
             "Standard_Mix": {
                 "name": "Standard Mix",
                 "start_date": datetime.now().strftime("%Y-%m-%d"),
-                "cycles": {
-                    "seeding": {
+                "cycles": [
+                    {
+                        "name": "seeding",
                         "duration_days": 3,
                         "initial_time": 8,
                         "total_hours": 23,
+                        "target_total_hours": 23,
                         "ultra_red_step_mins": 15,
                         "infra_blue_step_mins": 15,
                         "ultra_red_sunrise": true,
@@ -62,10 +64,12 @@ def get_default_config():
                         "irrigation_timer": 15,
                         "target_volume_liters": 0.0
                     },
-                    "vegetation": {
+                    {
+                        "name": "vegetation",
                         "duration_days": 35,
                         "initial_time": 8,
                         "total_hours": 21,
+                        "target_total_hours": 21,
                         "ultra_red_step_mins": 15,
                         "infra_blue_step_mins": 15,
                         "ultra_red_sunrise": true,
@@ -79,7 +83,8 @@ def get_default_config():
                         "irrigation_timer": 15,
                         "target_volume_liters": 0.0
                     },
-                    "pre_blooming": {
+                    {
+                        "name": "pre_blooming",
                         "duration_days": 8,
                         "initial_time": 8,
                         "total_hours": 21,
@@ -97,10 +102,12 @@ def get_default_config():
                         "irrigation_timer": 15,
                         "target_volume_liters": 0.0
                     },
-                    "blooming": {
+                    {
+                        "name": "blooming",
                         "duration_days": 60,
                         "initial_time": 8,
                         "total_hours": 12,
+                        "target_total_hours": 12,
                         "ultra_red_step_mins": 15,
                         "infra_blue_step_mins": 15,
                         "ultra_red_sunrise": true,
@@ -113,8 +120,27 @@ def get_default_config():
                         "irrigation_start_time": "08:00",
                         "irrigation_timer": 15,
                         "target_volume_liters": 0.0
+                    },
+                    {
+                        "name": "harvest_time",
+                        "duration_days": 1,
+                        "initial_time": 8,
+                        "total_hours": 0,
+                        "target_total_hours": 0,
+                        "ultra_red_step_mins": 0,
+                        "infra_blue_step_mins": 0,
+                        "ultra_red_sunrise": false,
+                        "ultra_red_full": false,
+                        "infra_blue_sunrise": false,
+                        "infra_blue_full": false,
+                        "tank_time": 12,
+                        "watering_days": [],
+                        "multiplier": 0,
+                        "irrigation_start_time": "08:00",
+                        "irrigation_timer": 0,
+                        "target_volume_liters": 0.0
                     }
-                }
+                ]
             }
         }
     }

@@ -304,10 +304,17 @@ const app = {
 
         // Render Cycles
         this.cyclesList.innerHTML = '';
-        const cycles = plantData.cycles || {};
-        Object.keys(cycles).forEach(name => {
-            this.addCycleField(name, cycles[name]);
-        });
+        const cycles = plantData.cycles || [];
+        if (Array.isArray(cycles)) {
+            cycles.forEach(cycle => {
+                this.addCycleField(cycle.name, cycle);
+            });
+        } else {
+            // Backward compatibility for old dict format
+            Object.keys(cycles).forEach(name => {
+                this.addCycleField(name, cycles[name]);
+            });
+        }
     },
 
     addCycleField(name = '', config = {}) {
@@ -385,7 +392,7 @@ const app = {
             return;
         }
 
-        const cycles = {};
+        const cycles = [];
         document.querySelectorAll('.cycle-item').forEach(item => {
             const name = item.querySelector('.cyc-name').value;
             if(!name) return;
@@ -393,7 +400,8 @@ const app = {
             const selectedDays = [];
             item.querySelectorAll('.cyc-days:checked').forEach(cb => selectedDays.push(parseInt(cb.value)));
 
-            cycles[name] = {
+            cycles.push({
+                name: name,
                 duration_days: parseInt(item.querySelector('.cyc-duration').value),
                 initial_time: parseInt(item.querySelector('.cyc-light-start').value),
                 total_hours: parseInt(item.querySelector('.cyc-hours').value),
@@ -413,7 +421,7 @@ const app = {
                 watering_days: selectedDays,
                 multiplier: 1,
                 tank_time: 15
-            };
+            });
         });
 
         // Ensure we preserve other plants
