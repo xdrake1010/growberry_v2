@@ -18,26 +18,34 @@ class CameraController:
             os.makedirs(path, exist_ok=True)
 
     def _get_camera(self):
-        """Attempts to open the camera with preferred backends and settings."""
-        # Try preferred index first, then probe others if it fails
-        indices_to_try = [self.camera_index] + [i for i in range(5) if i != self.camera_index]
-        
-        for idx in indices_to_try:
-            # We use CAP_V4L2 for better compatibility/performance on Pi/Linux
-            cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
-            if cap.isOpened():
-                # Set format to MJPG to reduce USB bandwidth and memory overhead
-                # This is critical for avoiding 'Failed to allocate memory' on Pi Zero 2 W
-                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        """Attempts to open the camera with preferred backends and settings.
+        Includes a retry loop to handle transient USB disconnects (EMI).
+        """
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            # Try preferred index first, then probe others if it fails
+            indices_to_try = [self.camera_index] + [i for i in range(5) if i != self.camera_index]
+            
+            for idx in indices_to_try:
+                # We use CAP_V4L2 for better compatibility/performance on Pi/Linux
+                cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+                if cap.isOpened():
+                    # Set format to MJPG to reduce USB bandwidth and memory overhead
+                    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                    
+                    # Set lower resolution immediately to save memory
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    # Set buffer size to 1 to avoid lag
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    
+                    self.camera_index = idx # Remember working index
+                    return cap
+            
+            if attempt < max_attempts - 1:
+                logger.warning(f"No camera found on attempt {attempt + 1}. Retrying in 2s...")
+                time.sleep(2.0)
                 
-                # Set lower resolution immediately to save memory
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                # Set buffer size to 1 to avoid lag
-                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                
-                self.camera_index = idx # Remember working index
-                return cap
         return None
 
     def capture_timelapse_frame(self):
