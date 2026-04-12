@@ -1,3 +1,4 @@
+const app = {
     init() {
         this.cacheDOM();
         this.bindEvents();
