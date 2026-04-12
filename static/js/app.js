@@ -274,6 +274,14 @@ const app = {
         this.cyclesList.insertAdjacentHTML('beforeend', html);
     },
 
+    setStartDateToday() {
+        const now = new Date();
+        const offset = now.getTimezoneOffset();
+        const local = new Date(now.getTime() - (offset * 60 * 1000));
+        const today = local.toISOString().split('T')[0];
+        document.getElementById('cfg-start-date').value = today;
+    },
+
     async generateAndSaveConfig() {
         const cosechaName = document.getElementById('cfg-cosecha-name').value;
         const startDate = document.getElementById('cfg-start-date').value;
