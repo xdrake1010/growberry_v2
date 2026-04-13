@@ -1,3 +1,4 @@
+const app = {
     init() {
         console.log("Growberry App initializing...");
         try { this.cacheDOM(); } catch(e) { console.error("DOM Cache failed", e); }
@@ -307,6 +308,7 @@
             }
         } catch(e) {
             this.showToast(e.message, true);
+        }
     },
 
     async syncGallery() {
@@ -453,6 +455,7 @@
                 this.showToast("Timelapse settings updated");
                 this.fullConfig = newConfig;
             } else { throw new Error(data.message); }
+        } catch(e) { this.showToast(e.message, true); }
     },
 
     async exportTimelapse() {
