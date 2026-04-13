@@ -12,9 +12,9 @@ const app = {
             this.fetchStats();
             
             // Refresh stats and charts every 30 seconds
-            setInterval(() => {
-                this.fetchStats();
-                this.updateCharts();
+            setInterval(async () => {
+                await this.fetchStats();
+                await this.updateCharts();
                 if(document.getElementById('timelapse') && document.getElementById('timelapse').classList.contains('active')) {
                     this.fetchCameraStatus();
                 }
