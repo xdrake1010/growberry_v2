@@ -7,10 +7,11 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger("Growberry.Scheduler")
 
 class ScheduleManager:
-    def __init__(self, led_controller, tank_controller, irrigation_controller, config_data):
+    def __init__(self, led_controller, tank_controller, irrigation_controller, config_data, scheduler_lock):
         self.led_controller = led_controller
         self.tank_controller = tank_controller
         self.irrigation_controller = irrigation_controller
+        self.scheduler_lock = scheduler_lock
         self.reload_config(config_data)
 
     def reload_config(self, config_data: dict):
@@ -73,71 +74,73 @@ class ScheduleManager:
         # Tank
         tank_time = cycle.get("tank_time", 15)
 
-        schedule.clear()
-        
-        # --- Lighting Logic ---
-        start_dt = datetime.strptime(f"{initial_time:02d}:00", "%H:%M")
-        t0 = start_dt.strftime("%H:%M")
-        t1 = (start_dt + timedelta(minutes=red_step)).strftime("%H:%M")
-        t2 = (start_dt + timedelta(minutes=red_step + blue_step)).strftime("%H:%M")
-        
-        end_dt = start_dt + timedelta(hours=total_hours)
-        e0 = (end_dt - timedelta(minutes=red_step + blue_step)).strftime("%H:%M")
-        e1 = (end_dt - timedelta(minutes=red_step)).strftime("%H:%M")
-        e2 = end_dt.strftime("%H:%M")
+        with self.scheduler_lock:
+            # ONLY clear lighting/irrigation tasks, DO NOT touch background logging/timelapse
+            schedule.clear('lighting_tasks')
+            
+            # --- Lighting Logic ---
+            start_dt = datetime.strptime(f"{initial_time:02d}:00", "%H:%M")
+            t0 = start_dt.strftime("%H:%M")
+            t1 = (start_dt + timedelta(minutes=red_step)).strftime("%H:%M")
+            t2 = (start_dt + timedelta(minutes=red_step + blue_step)).strftime("%H:%M")
+            
+            end_dt = start_dt + timedelta(hours=total_hours)
+            e0 = (end_dt - timedelta(minutes=red_step + blue_step)).strftime("%H:%M")
+            e1 = (end_dt - timedelta(minutes=red_step)).strftime("%H:%M")
+            e2 = end_dt.strftime("%H:%M")
 
-        # Start Sequence
-        if red_sunrise:
-            schedule.every().day.at(t0).do(self.led_controller.led_controls["infrared_on"])
-        elif red_full:
-            schedule.every().day.at(t2).do(self.led_controller.led_controls["infrared_on"])
+            # Start Sequence
+            if red_sunrise:
+                schedule.every().day.at(t0).do(self.led_controller.led_controls["infrared_on"]).tag('lighting_tasks')
+            elif red_full:
+                schedule.every().day.at(t2).do(self.led_controller.led_controls["infrared_on"]).tag('lighting_tasks')
 
-        if blue_sunrise:
-            schedule.every().day.at(t1).do(self.led_controller.led_controls["ultrablue_on"])
-        elif blue_full:
-            schedule.every().day.at(t2).do(self.led_controller.led_controls["ultrablue_on"])
+            if blue_sunrise:
+                schedule.every().day.at(t1).do(self.led_controller.led_controls["ultrablue_on"]).tag('lighting_tasks')
+            elif blue_full:
+                schedule.every().day.at(t2).do(self.led_controller.led_controls["ultrablue_on"]).tag('lighting_tasks')
 
-        def main_on_with_overlap():
-            self.led_controller.led_controls["main_on"]()
-            time.sleep(1)
-            if red_sunrise and not red_full:
-                self.led_controller.led_controls["infrared_off"]()
-            if blue_sunrise and not blue_full:
-                self.led_controller.led_controls["ultrablue_off"]()
-        
-        schedule.every().day.at(t2).do(main_on_with_overlap)
-        
-        # End Sequence
-        def main_off_with_overlap():
-            if red_sunrise and not red_full:
-                self.led_controller.led_controls["infrared_on"]()
-            if blue_sunrise and not blue_full:
-                self.led_controller.led_controls["ultrablue_on"]()
-            time.sleep(1)
-            self.led_controller.led_controls["main_off"]()
-            if not red_full and not red_sunrise:
-                 self.led_controller.led_controls["infrared_off"]()
-            if not blue_full and not blue_sunrise:
-                 self.led_controller.led_controls["ultrablue_off"]()
-                
-        schedule.every().day.at(e0).do(main_off_with_overlap)
-        
-        if blue_sunrise:
-            schedule.every().day.at(e1).do(self.led_controller.led_controls["ultrablue_off"])
-        elif blue_full:
-            schedule.every().day.at(e2).do(self.led_controller.led_controls["ultrablue_off"])
+            def main_on_with_overlap():
+                self.led_controller.led_controls["main_on"]()
+                time.sleep(1)
+                if red_sunrise and not red_full:
+                    self.led_controller.led_controls["infrared_off"]()
+                if blue_sunrise and not blue_full:
+                    self.led_controller.led_controls["ultrablue_off"]()
+            
+            schedule.every().day.at(t2).do(main_on_with_overlap).tag('lighting_tasks')
+            
+            # End Sequence
+            def main_off_with_overlap():
+                if red_sunrise and not red_full:
+                    self.led_controller.led_controls["infrared_on"]()
+                if blue_sunrise and not blue_full:
+                    self.led_controller.led_controls["ultrablue_on"]()
+                time.sleep(1)
+                self.led_controller.led_controls["main_off"]()
+                if not red_full and not red_sunrise:
+                     self.led_controller.led_controls["infrared_off"]()
+                if not blue_full and not blue_sunrise:
+                     self.led_controller.led_controls["ultrablue_off"]()
+                    
+            schedule.every().day.at(e0).do(main_off_with_overlap).tag('lighting_tasks')
+            
+            if blue_sunrise:
+                schedule.every().day.at(e1).do(self.led_controller.led_controls["ultrablue_off"]).tag('lighting_tasks')
+            elif blue_full:
+                schedule.every().day.at(e2).do(self.led_controller.led_controls["ultrablue_off"]).tag('lighting_tasks')
 
-        if red_sunrise or red_full:
-            schedule.every().day.at(e2).do(self.led_controller.led_controls["infrared_off"])
+            if red_sunrise or red_full:
+                schedule.every().day.at(e2).do(self.led_controller.led_controls["infrared_off"]).tag('lighting_tasks')
 
-        # --- Tank & Irrigation ---
-        schedule.every().day.at(f"{tank_time:02d}:00").do(self.tank_controller.control_tank)
-        def conditional_irrigation():
-            today = datetime.now().weekday()
-            if today in watering_days:
-                logger.info("Triggering scheduled irrigation...")
-                self.irrigation_controller.control_irrigation(irrigation_timer=irrigation_timer, multiplier=multiplier)
-        schedule.every().day.at(irrigation_start).do(conditional_irrigation)
+            # --- Tank & Irrigation ---
+            schedule.every().day.at(f"{tank_time:02d}:00").do(self.tank_controller.control_tank).tag('lighting_tasks')
+            def conditional_irrigation():
+                today = datetime.now().weekday()
+                if today in watering_days:
+                    logger.info("Triggering scheduled irrigation...")
+                    self.irrigation_controller.control_irrigation(irrigation_timer=irrigation_timer, multiplier=multiplier)
+            schedule.every().day.at(irrigation_start).do(conditional_irrigation).tag('lighting_tasks')
         
         self.sync_hardware_to_schedule(cycle, days_elapsed)
 

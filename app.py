@@ -60,7 +60,8 @@ class ApplicationSystem:
             self.led_controller, 
             self.tank_controller, 
             self.irrigation_controller, 
-            self.config_data
+            self.config_data,
+            self.scheduler_lock
         )
         self.camera_controller = CameraController(cosecha_name=self.active_cosecha)
         self.video_generator = VideoGenerator()
