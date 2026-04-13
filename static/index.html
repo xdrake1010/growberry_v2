@@ -230,6 +230,11 @@
                                     <button class="btn secondary sm" onclick="app.setStartDateToday()">Set to Today</button>
                                 </div>
                             </div>
+                            <div class="input-group">
+                                <label>Sensor Log Frequency (min)</label>
+                                <input type="number" id="cfg-log-interval" min="1" max="60" placeholder="1">
+                                <small style="opacity: 0.6;">How often to save Temp/Hum to history.</small>
+                            </div>
                             <hr style="opacity:0.1; margin:10px 0;">
                             <div class="cycles-editor">
                                 <div class="cycles-header">

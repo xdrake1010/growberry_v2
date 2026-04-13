@@ -94,21 +94,29 @@ class ApplicationSystem:
         else:
             logger.warning("Historical Log skipped: No sensor data in cache.")
 
-    def scheduled_timelapse(self):
+    def scheduled_timelapse(self, is_manual=False):
         """Capture a timelapse frame with current sensor metadata, handling night flash if needed."""
+        # Check lighting state
+        all_states = self.led_controller.get_all_states()
+        any_light_on = any(info["state"] for info in all_states.values())
+        
+        # Plant stress safety: Skip auto-timelapse if dark
+        if not any_light_on and not is_manual:
+            logger.info("[TIMELAPSE] Dark cycle detected. Skipping automatic capture to prevent plant stress.")
+            return False
+
+        # Flash logic for Manual captures during night
+        restore_main = False
+        if not any_light_on and is_manual:
+            logger.info("[TIMELAPSE] Dark detected + Manual request. Pulsing Main White for 2s...")
+            self.led_controller.led_control("main", GPIO_PINS["main_led"], True)
+            time.sleep(2) # Wait for camera exposure
+            restore_main = True
+        
         with self.lock:
             temp = self.sensor_data.get("temperature")
             hum = self.sensor_data.get("humidity")
             harvest = self.active_cosecha
-        
-        # Flash logic: if all lights are off, pulse main white for 2 seconds
-        restore_main = False
-        all_states = self.led_controller.get_all_states()
-        if not any(info["state"] for info in all_states.values()):
-            logger.info("[TIMELAPSE] Dark detected. Pulsing Main White for 2s...")
-            self.led_controller.led_control("main", GPIO_PINS["main_led"], True)
-            time.sleep(2) # Wait for camera exposure
-            restore_main = True
         
         metadata = {"temp": temp, "hum": hum, "harvest": harvest}
         success = self.camera_controller.capture_timelapse_frame(metadata=metadata)
@@ -128,15 +136,17 @@ class ApplicationSystem:
         # 1. Daily refresh (Cycle phase verification)
         schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule).tag('background_tasks')
 
-        # 2. Sequential Sensor Logging for History (every 15 mins)
-        schedule.every(15).minutes.do(self.log_sensors).tag('background_tasks')
+        # 2. Sequential Sensor Logging for History (Custom Interval)
+        log_interval = self.config_data.get("sensor_log_interval_minutes", 1)
+        schedule.every(log_interval).minutes.do(self.log_sensors).tag('background_tasks')
+        logger.info(f"[SCHEDULER] Sensor logging enabled every {log_interval} minutes.")
 
         # 3. Dynamic Timelapse Capture
         enabled = self.config_data.get("timelapse_enabled", True)
         interval = self.config_data.get("timelapse_interval_minutes", 60)
         
         if enabled:
-            schedule.every(interval).minutes.do(self.scheduled_timelapse).tag('background_tasks')
+            schedule.every(interval).minutes.do(lambda: self.scheduled_timelapse(is_manual=False)).tag('background_tasks')
             logger.info(f"[SCHEDULER] Automatic timelapse enabled every {interval} minutes.")
         else:
             logger.info("[SCHEDULER] Automatic timelapse is DISABLED.")
@@ -150,10 +160,9 @@ class ApplicationSystem:
         # Initial schedule setup from manager
         self.schedule_manager.refresh_schedule()
         
-        # Initial log on startup
+        # Initial log with delay to ensure cache is populated
         threading.Timer(5, lambda: self.db_manager.save_measurement("heartbeat", 1)).start()
-        # Immediate logging to populate charts faster
-        self.log_sensors()
+        threading.Timer(45, self.log_sensors).start()
         
         # New: Continuous cache update every 30 seconds
         def update_cache_loop():

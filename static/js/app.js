@@ -585,6 +585,10 @@ const app = {
                 document.getElementById('glr-timelapse-enabled').checked = enabled;
             }
             
+            if (document.getElementById('cfg-log-interval')) {
+                document.getElementById('cfg-log-interval').value = data.sensor_log_interval_minutes || 1;
+            }
+            
             this.renderHarvestData(data.active_cosecha || 'default');
 
         } catch(e) { console.error("Failed loading config into form", e); }
@@ -744,6 +748,8 @@ const app = {
             start_date: startDate, 
             cycles: cycles 
         };
+        
+        this.fullConfig.sensor_log_interval_minutes = parseInt(document.getElementById('cfg-log-interval').value) || 1;
 
         this.configEditor.value = JSON.stringify(this.fullConfig, null, 4);
         await this.saveConfig();
