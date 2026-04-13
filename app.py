@@ -81,36 +81,48 @@ class ApplicationSystem:
         # 1. Daily refresh (Cycle phase verification)
         schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule).tag('background_tasks')
 
-        # 2. Sequential Sensor Logging for History
-        def log_sensors():
-            with self.lock:
-                t = self.sensor_data.get("temperature")
-                h = self.sensor_data.get("humidity")
-            
-            if t is not None and h is not None:
-                self.db_manager.save_measurement("temperature", t)
-                self.db_manager.save_measurement("humidity", h)
-                logger.info(f"Historical Log: T={t}C, H={h}% saved to DB.")
-            else:
-                logger.warning("Historical Log skipped: No sensor data in cache.")
+    def log_sensors(self):
+        """Saves current cached sensor data to the database for history."""
+        with self.lock:
+            t = self.sensor_data.get("temperature")
+            h = self.sensor_data.get("humidity")
+        
+        if t is not None and h is not None:
+            self.db_manager.save_measurement("temperature", t)
+            self.db_manager.save_measurement("humidity", h)
+            logger.info(f"Historical Log: T={t}C, H={h}% saved to DB.")
+        else:
+            logger.warning("Historical Log skipped: No sensor data in cache.")
 
-        schedule.every(15).minutes.do(log_sensors).tag('background_tasks')
+    def scheduled_timelapse(self):
+        """Capture a timelapse frame with current sensor metadata."""
+        with self.lock:
+            metadata = {
+                "temp": self.sensor_data.get("temperature"),
+                "hum": self.sensor_data.get("humidity"),
+                "harvest": self.active_cosecha
+            }
+        self.camera_controller.capture_timelapse_frame(metadata=metadata)
+
+    def rebuild_scheduler(self):
+        """Standardized method to initialize or refresh all background scheduled tasks."""
+        logger.info("[SCHEDULER] Rebuilding background tasks...")
+        
+        # Clear existing jobs if any (using tags for precision)
+        schedule.clear('background_tasks')
+
+        # 1. Daily refresh (Cycle phase verification)
+        schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule).tag('background_tasks')
+
+        # 2. Sequential Sensor Logging for History (every 15 mins)
+        schedule.every(15).minutes.do(self.log_sensors).tag('background_tasks')
 
         # 3. Dynamic Timelapse Capture
         enabled = self.config_data.get("timelapse_enabled", True)
         interval = self.config_data.get("timelapse_interval_minutes", 60)
         
         if enabled:
-            def scheduled_timelapse():
-                with self.lock:
-                    metadata = {
-                        "temp": self.sensor_data.get("temperature"),
-                        "hum": self.sensor_data.get("humidity"),
-                        "harvest": self.active_cosecha
-                    }
-                self.camera_controller.capture_timelapse_frame(metadata=metadata)
-
-            schedule.every(interval).minutes.do(scheduled_timelapse).tag('background_tasks')
+            schedule.every(interval).minutes.do(self.scheduled_timelapse).tag('background_tasks')
             logger.info(f"[SCHEDULER] Automatic timelapse enabled every {interval} minutes.")
         else:
             logger.info("[SCHEDULER] Automatic timelapse is DISABLED.")
@@ -125,8 +137,8 @@ class ApplicationSystem:
         self.schedule_manager.refresh_schedule()
         
         # Initial log on startup
-        threading.Timer(10, lambda: self.db_manager.save_measurement("heartbeat", 1)).start()
-        threading.Timer(10, log_sensors).start()
+        threading.Timer(5, lambda: self.db_manager.save_measurement("heartbeat", 1)).start()
+        threading.Timer(12, self.log_sensors).start()
         
         # New: Continuous cache update every 30 seconds
         def update_cache_loop():
