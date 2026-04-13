@@ -271,10 +271,9 @@ const app = {
         if (daysInfoEl) daysInfoEl.textContent = `Day ${currentJourneyDay} of ${totalJourneyDays}`;
         
         const bar = document.getElementById('timeline-bar');
-        const labels = document.getElementById('timeline-labels');
         const marker = document.getElementById('timeline-marker');
         
-        if (!bar || !labels || !marker) return;
+        if (!bar || !marker) return;
 
         // Clear previous segments (except marker)
         Array.from(bar.children).forEach(child => { if(child !== marker) child.remove(); });
