@@ -39,7 +39,8 @@ def get_statistics():
             "tank": tank_state,
             "irrigation": irrigation_state,
             "leds": led_info,
-            "cycle_info": cycle_info
+            "cycle_info": cycle_info,
+            "active_cosecha": _system.active_cosecha
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

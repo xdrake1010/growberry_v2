@@ -267,6 +267,7 @@ class ScheduleManager:
              "cycle_start_date": info["start_date"].isoformat(),
              "cycle_end_date": info["end_date"].isoformat(),
              "current_light_hours": round(current_h, 2),
+             "cosecha_name": self.active_cosecha,
              "schedule": info["cycle_config"]
         }
         return res
