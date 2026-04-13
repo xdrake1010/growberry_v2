@@ -268,6 +268,7 @@ class ScheduleManager:
              "cycle_end_date": info["end_date"].isoformat(),
              "current_light_hours": round(current_h, 2),
              "cosecha_name": self.active_cosecha,
+             "all_cycles": [{"name": c.get("name"), "duration": c.get("duration_days", 1)} for c in self.cycles],
              "schedule": info["cycle_config"]
         }
         return res

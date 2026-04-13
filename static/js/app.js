@@ -246,6 +246,9 @@ const app = {
                 
                 if (c.cycle_start_date && document.getElementById('cyc-start')) document.getElementById('cyc-start').textContent = c.cycle_start_date.split('T')[0];
                 if (c.cycle_end_date && document.getElementById('cyc-end')) document.getElementById('cyc-end').textContent = c.cycle_end_date.split('T')[0];
+                
+                // NEW: Render the multi-segment journey timeline
+                this.renderTimeline(c);
             } else {
                 if (cycleEl) cycleEl.textContent = 'INACTIVE';
                 if (document.getElementById('cyc-elapsed')) document.getElementById('cyc-elapsed').textContent = '0';
