@@ -7,6 +7,8 @@ const app = {
         this.fetchStats();
         this.initCharts();
         
+        this.galleryState = { cosecha: null, date: null, rawData: [] };
+        
         // Refresh stats and charts every 30 seconds (matches sensor cache)
         setInterval(() => {
             this.fetchStats();
@@ -298,66 +300,152 @@ const app = {
             }
         } catch(e) {
             this.showToast(e.message, true);
-        }
     },
 
-    async loadGallery() {
+    async syncGallery() {
+        this.showToast("Syncing gallery index...");
+        await this.loadGallery(true);
+    },
+
+    async loadGallery(forceSync = false) {
         const container = document.getElementById('gallery-container');
         this.loadExports(); // Also load video history
         try {
-            const res = await fetch('/api/timelapse/index');
-            if(!res.ok) throw new Error('Failed to fetch gallery index');
-            const data = await res.json();
-            
-            if(!data || data.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fa-solid fa-images"></i>
-                        <p>No images found yet. Captures happen every hour.</p>
-                        <p style="font-size: 0.8em; margin-top: 10px;">If you already took a "Manual Capture", check the camera health indicator above.</p>
-                    </div>
-                `;
-                return;
+            if (forceSync || this.galleryState.rawData.length === 0) {
+                const res = await fetch('/api/timelapse/index');
+                if(!res.ok) throw new Error('Failed to fetch gallery index');
+                this.galleryState.rawData = await res.json();
             }
-
-            container.innerHTML = '';
             
-            data.forEach(cosecha => {
-                const cosechaEl = document.createElement('div');
-                cosechaEl.className = 'cosecha-group';
-                cosechaEl.innerHTML = `<h3><i class="fa-solid fa-folder-open"></i> ${cosecha.name}</h3>`;
-                
-                cosecha.dates.forEach(dateEntry => {
-                    const dateEl = document.createElement('div');
-                    dateEl.className = 'date-group';
-                    dateEl.innerHTML = `<h4>${dateEntry.date}</h4>`;
-                    
-                    const grid = document.createElement('div');
-                    grid.className = 'gallery-grid';
-                    
-                    dateEntry.images.forEach(img => {
-                        const card = document.createElement('div');
-                        card.className = 'image-card';
-                        card.onclick = () => this.openLightbox(img.url, `${cosecha.name} - ${dateEntry.date} ${img.timestamp}`);
-                        
-                        card.innerHTML = `
-                            <img src="${img.url}" alt="${img.name}" loading="lazy">
-                            <div class="img-info">${img.timestamp.match(/.{1,2}/g).join(':')}</div>
-                        `;
-                        grid.appendChild(card);
-                    });
-                    
-                    dateEl.appendChild(grid);
-                    cosechaEl.appendChild(dateEl);
-                });
-                
-                container.appendChild(cosechaEl);
-            });
-
+            this.renderGallery();
         } catch(e) {
-            console.error("Gallery load failed", e);
-            this.showToast("Failed to load image gallery", true);
+            console.error("Gallery sync failed", e);
+            this.showToast("Failed to sync gallery", true);
         }
+    },
+
+    renderGallery() {
+        const container = document.getElementById('gallery-container');
+        const { cosecha, date, rawData } = this.galleryState;
+        
+        this.renderBreadcrumbs();
+        container.innerHTML = '';
+
+        if (!rawData || rawData.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-solid fa-images"></i>
+                    <p>No images found yet. Captures happen every hour.</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (!cosecha) {
+            this.renderHarvests(rawData);
+        } else if (cosecha && !date) {
+            const cosechaData = rawData.find(c => c.name === cosecha);
+            this.renderDates(cosechaData);
+        } else {
+            const cosechaData = rawData.find(c => c.name === cosecha);
+            const dateData = cosechaData?.dates.find(d => d.date === date);
+            this.renderImages(cosechaData, dateData);
+        }
+    },
+
+    renderHarvests(data) {
+        const grid = document.createElement('div');
+        grid.className = 'category-grid';
+        data.forEach(cosecha => {
+            const card = document.createElement('div');
+            card.className = 'folder-card glass-panel sm';
+            card.onclick = () => { this.galleryState.cosecha = cosecha.name; this.renderGallery(); };
+            card.innerHTML = `
+                <i class="fa-solid fa-folder-closed"></i>
+                <strong>${cosecha.name}</strong>
+                <span>${cosecha.dates.length} Days tracked</span>
+            `;
+            grid.appendChild(card);
+        });
+        document.getElementById('gallery-container').appendChild(grid);
+    },
+
+    renderDates(cosechaData) {
+        const grid = document.createElement('div');
+        grid.className = 'category-grid';
+        cosechaData.dates.forEach(entry => {
+            const card = document.createElement('div');
+            card.className = 'folder-card with-preview glass-panel sm';
+            card.onclick = () => { this.galleryState.date = entry.date; this.renderGallery(); };
+            
+            const firstImg = entry.images[0]?.url || '';
+            card.innerHTML = `
+                <img src="${firstImg}" class="preview-img" loading="lazy">
+                <div class="folder-overlay">
+                    <i class="fa-solid fa-calendar-day" style="font-size: 32px;"></i>
+                    <strong>${entry.date}</strong>
+                    <span>${entry.images.length} Captures</span>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+        document.getElementById('gallery-container').appendChild(grid);
+    },
+
+    renderImages(cosecha, dateEntry) {
+        const grid = document.createElement('div');
+        grid.className = 'gallery-grid';
+        dateEntry.images.forEach(img => {
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            card.onclick = () => this.openLightbox(img.url, `${cosecha.name} - ${dateEntry.date} ${img.timestamp}`);
+            card.innerHTML = `
+                <img src="${img.url}" alt="${img.name}" loading="lazy">
+                <div class="img-info">${img.timestamp.match(/.{1,2}/g).join(':')}</div>
+            `;
+            grid.appendChild(card);
+        });
+        document.getElementById('gallery-container').appendChild(grid);
+    },
+
+    renderBreadcrumbs() {
+        const container = document.getElementById('gallery-breadcrumbs');
+        const { cosecha, date } = this.galleryState;
+        
+        container.innerHTML = `<span class="breadcrumb-item ${!cosecha ? 'active' : ''}" onclick="app.resetGallery()">Gallery</span>`;
+        if (cosecha) {
+            container.innerHTML += `<span class="breadcrumb-sep">/</span><span class="breadcrumb-item ${!date ? 'active' : ''}" onclick="app.galleryState.date = null; app.renderGallery()">${cosecha}</span>`;
+        }
+        if (date) {
+            container.innerHTML += `<span class="breadcrumb-sep">/</span><span class="breadcrumb-item active">${date}</span>`;
+        }
+    },
+
+    resetGallery() {
+        this.galleryState.cosecha = null;
+        this.galleryState.date = null;
+        this.renderGallery();
+    },
+
+    async saveTimelapseQuickSettings() {
+        const enabled = document.getElementById('glr-timelapse-enabled').checked;
+        const interval = parseInt(document.getElementById('glr-timelapse-interval').value) || 60;
+        
+        try {
+            const newConfig = JSON.parse(JSON.stringify(this.fullConfig));
+            newConfig.timelapse_enabled = enabled;
+            newConfig.timelapse_interval_minutes = interval;
+            
+            const res = await fetch('/api/configs', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(newConfig)
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                this.showToast("Timelapse settings updated");
+                this.fullConfig = newConfig;
+            } else { throw new Error(data.message); }
     },
 
     async exportTimelapse() {
@@ -469,12 +557,22 @@ const app = {
                 this.harvestSelector.appendChild(opt);
             });
             
-            // Set global interval
+            const interval = data.timelapse_interval_minutes || 60;
+            const enabled = data.timelapse_enabled !== false;
+
             if (document.getElementById('cfg-timelapse-interval')) {
-                document.getElementById('cfg-timelapse-interval').value = data.timelapse_interval_minutes || 60;
+                document.getElementById('cfg-timelapse-interval').value = interval;
             }
             if (document.getElementById('cfg-timelapse-enabled')) {
-                document.getElementById('cfg-timelapse-enabled').checked = data.timelapse_enabled !== false;
+                document.getElementById('cfg-timelapse-enabled').checked = enabled;
+            }
+            
+            // Sync Gallery Toolbar
+            if (document.getElementById('glr-timelapse-interval')) {
+                document.getElementById('glr-timelapse-interval').value = interval;
+            }
+            if (document.getElementById('glr-timelapse-enabled')) {
+                document.getElementById('glr-timelapse-enabled').checked = enabled;
             }
             
             this.renderHarvestData(data.active_cosecha || 'default');

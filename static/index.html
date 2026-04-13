@@ -230,21 +230,7 @@
                                     <button class="btn secondary sm" onclick="app.setStartDateToday()">Set to Today</button>
                                 </div>
                             </div>
-
                             <hr style="opacity:0.1; margin:10px 0;">
-                            <div class="cycles-header">
-                                <h3>Global Settings</h3>
-                            </div>
-                            <div class="input-group">
-                                <label class="check-label" style="margin-bottom: 12px; font-weight: 600;">
-                                    <input type="checkbox" id="cfg-timelapse-enabled" checked> Enable Automatic Timelapse
-                                </label>
-                                <label>Timelapse Frequency (Minutes)</label>
-                                <input type="number" id="cfg-timelapse-interval" placeholder="Default: 60" min="1" max="1440">
-                            </div>
-
-                            <hr style="opacity:0.1; margin:10px 0;">
-
                             <div class="cycles-editor">
                                 <div class="cycles-header">
                                     <h3>Cultivation Cycles</h3>
@@ -278,10 +264,30 @@
                                 <span id="cam-status-text">Checking Camera...</span>
                             </div>
                             <div class="gallery-actions">
-                                <button class="btn secondary sm" onclick="app.loadGallery()"><i class="fa-solid fa-rotate"></i> Sync</button>
-                                <button class="btn secondary sm" onclick="app.exportTimelapse()"><i class="fa-solid fa-video"></i> Create Video</button>
                                 <button class="btn primary sm" onclick="app.captureFrame()"><i class="fa-solid fa-camera"></i> Manual Capture</button>
                             </div>
+                        </div>
+
+                        <div class="gallery-config-bar glass-panel sm">
+                            <div class="config-row">
+                                <label class="check-label sm">
+                                    <input type="checkbox" id="glr-timelapse-enabled" onchange="app.saveTimelapseQuickSettings()"> Auto Captures
+                                </label>
+                                <div class="input-mini">
+                                    <label>Every</label>
+                                    <input type="number" id="glr-timelapse-interval" min="1" placeholder="60">
+                                    <span>min</span>
+                                </div>
+                                <button class="btn secondary xs" onclick="app.saveTimelapseQuickSettings()">Save</button>
+                            </div>
+                            <div class="config-actions">
+                                <button class="btn secondary sm" onclick="app.syncGallery()"><i class="fa-solid fa-rotate"></i> Sync Index</button>
+                                <button class="btn primary sm" onclick="app.exportTimelapse()"><i class="fa-solid fa-video"></i> Export MP4</button>
+                            </div>
+                        </div>
+
+                        <div id="gallery-breadcrumbs" class="gallery-breadcrumbs">
+                            <!-- Breadcrumbs will be injected here -->
                         </div>
 
                         <div id="exports-container" class="exports-list hidden">
