@@ -17,30 +17,43 @@ class DatabaseManager:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     sensor TEXT NOT NULL,
-                    value REAL NOT NULL
+                    value REAL NOT NULL,
+                    harvest TEXT
                 )
             ''')
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_sensor_time ON measurements(sensor, timestamp)')
+            # Check if harvest column exists (migration)
+            cursor = conn.execute("PRAGMA table_info(measurements)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'harvest' not in columns:
+                conn.execute('ALTER TABLE measurements ADD COLUMN harvest TEXT')
+            
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_sensor_time ON measurements(sensor, timestamp, harvest)')
             conn.commit()
 
-    def save_measurement(self, sensor: str, value: float):
+    def save_measurement(self, sensor: str, value: float, harvest: str = "unknown"):
         try:
             with self._get_connection() as conn:
                 conn.execute(
-                    'INSERT INTO measurements (timestamp, sensor, value) VALUES (?, ?, ?)',
-                    (datetime.now().isoformat(), sensor, value)
+                    'INSERT INTO measurements (timestamp, sensor, value, harvest) VALUES (?, ?, ?, ?)',
+                    (datetime.now().isoformat(), sensor, value, harvest)
                 )
                 conn.commit()
         except Exception as e:
             print(f"Error saving to DB: {e}")
 
-    def get_history(self, sensor: str, limit: int = 100):
+    def get_history(self, sensor: str, harvest: str = None, limit: int = 100):
         try:
             with self._get_connection() as conn:
-                cursor = conn.execute(
-                    'SELECT timestamp, value FROM measurements WHERE sensor = ? ORDER BY timestamp DESC LIMIT ?',
-                    (sensor, limit)
-                )
+                if harvest:
+                    cursor = conn.execute(
+                        'SELECT timestamp, value FROM measurements WHERE sensor = ? AND harvest = ? ORDER BY timestamp DESC LIMIT ?',
+                        (sensor, harvest, limit)
+                    )
+                else:
+                    cursor = conn.execute(
+                        'SELECT timestamp, value FROM measurements WHERE sensor = ? ORDER BY timestamp DESC LIMIT ?',
+                        (sensor, limit)
+                    )
                 # Return in chronological order for charting
                 return [{"timestamp": row[0], "value": row[1]} for row in cursor.fetchall()][::-1]
         except Exception as e:

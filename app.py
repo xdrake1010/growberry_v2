@@ -83,9 +83,9 @@ class ApplicationSystem:
                 h = self.sensor_data.get("humidity")
             
             if t is not None and h is not None:
-                self.db_manager.save_measurement("temperature", t)
-                self.db_manager.save_measurement("humidity", h)
-                logger.info(f"Historical Log: T={t}C, H={h}% saved to DB.")
+                self.db_manager.save_measurement("temperature", t, harvest=self.active_cosecha)
+                self.db_manager.save_measurement("humidity", h, harvest=self.active_cosecha)
+                logger.info(f"Historical Log: T={t}C, H={h}% saved to DB for {self.active_cosecha}.")
             else:
                 logger.warning("Historical Log skipped: No sensor data in cache yet.")
         except Exception as e:
@@ -159,7 +159,7 @@ class ApplicationSystem:
         self.schedule_manager.refresh_schedule()
         
         # Initial log with delay to ensure cache is populated
-        threading.Timer(5, lambda: self.db_manager.save_measurement("heartbeat", 1)).start()
+        threading.Timer(5, lambda: self.db_manager.save_measurement("heartbeat", 1, harvest=self.active_cosecha)).start()
         threading.Timer(45, self.log_sensors).start()
         
         # New: Continuous cache update every 30 seconds

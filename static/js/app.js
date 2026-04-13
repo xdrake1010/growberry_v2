@@ -133,9 +133,10 @@ const app = {
 
     async updateCharts() {
         try {
+            const harvest = this.activeCosecha || '';
             const [tempRes, humRes] = await Promise.all([
-                fetch('/api/history?sensor=temperature&limit=50'),
-                fetch('/api/history?sensor=humidity&limit=50')
+                fetch(`/api/history?sensor=temperature&limit=50&harvest=${harvest}`),
+                fetch(`/api/history?sensor=humidity&limit=50&harvest=${harvest}`)
             ]);
             
             const parseDate = (isoStr) => {
@@ -165,7 +166,8 @@ const app = {
     async loadFullHistory() {
         try {
             const sensor = document.getElementById('hist-sensor-select').value;
-            const res = await fetch(`/api/history?sensor=${sensor}&limit=500`);
+            const harvest = this.activeCosecha || '';
+            const res = await fetch(`/api/history?sensor=${sensor}&limit=500&harvest=${harvest}`);
             const data = await res.json();
 
             // Update Chart
@@ -214,6 +216,8 @@ const app = {
             if(!res.ok) throw new Error('Failed to fetch');
             const data = await res.json();
             
+            this.activeCosecha = data.active_cosecha || data.cycle_info?.cosecha_name;
+
             // Basic Environment
             document.getElementById('val-temp').textContent = data.temperature ? `${data.temperature}°C` : '--°C';
             document.getElementById('val-hum').textContent = data.humidity ? `${data.humidity}%` : '--%';
@@ -697,9 +701,9 @@ const app = {
             const startDate = document.getElementById('cfg-start-date').value;
             const logInterval = parseInt(document.getElementById('cfg-log-interval').value) || 1;
             
-            // Timelapse settings from the form (not the mini-toggle)
-            const timelapseInterval = parseInt(document.getElementById('cfg-timelapse-interval').value) || 60;
-            const timelapseEnabled = document.getElementById('cfg-timelapse-enabled').checked;
+            // CORRECTED: Using 'glr-' prefix which matches index.html
+            const timelapseInterval = parseInt(document.getElementById('glr-timelapse-interval').value) || 60;
+            const timelapseEnabled = document.getElementById('glr-timelapse-enabled').checked;
             
             if(!cosechaName) {
                 this.showToast("Please provide a name for the Cosecha", true);

@@ -174,8 +174,10 @@ def set_configs():
 @api.route('/history', methods=['GET'])
 def get_history():
     sensor = request.args.get('sensor', 'temperature')
-    limit = request.args.get('limit', default=48, type=int) # 48 entries x 15 mins = 12 hours
-    history = _system.db_manager.get_history(sensor, limit)
+    limit = request.args.get('limit', default=100, type=int) 
+    harvest = request.args.get('harvest', None)
+    
+    history = _system.db_manager.get_history(sensor, harvest=harvest, limit=limit)
     return jsonify(history)
 
 @api.route('/timelapse/export', methods=['POST'])
