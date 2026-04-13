@@ -2,6 +2,7 @@ import cv2
 import os
 import time
 import logging
+import threading
 from datetime import datetime
 from config import TIMELAPSE_BASE_DIR
 
@@ -12,48 +13,80 @@ class CameraController:
         self.cosecha_name = cosecha_name
         self.is_streaming = False
         self.camera_index = 0  # Default to 0, will probe if it fails
+        self.lock = threading.Lock()
+        self.client_count = 0
+        self.shared_camera = None
+        self.last_frame = None
+
+    def set_cosecha_name(self, name):
+        self.cosecha_name = name
+        logger.info(f"Camera controller harvest name updated to: {name}")
 
     def _ensure_dir(self, path):
         if not os.path.exists(path):
             os.makedirs(path, exist_ok=True)
 
+    def check_available_cameras(self):
+        """Probes basic indices to see what's actually available on the system."""
+        available = []
+        for idx in range(10):
+            cap = cv2.VideoCapture(idx)
+            if cap.isOpened():
+                available.append(idx)
+                cap.release()
+        return available
+
     def _get_camera(self):
         """Attempts to open the camera with preferred backends and settings.
         Includes a retry loop to handle transient USB disconnects (EMI).
+        Expects self.lock to be held by caller.
         """
-        max_attempts = 3
+        # If already opened by another thread, return it
+        if self.shared_camera is not None:
+             try:
+                 if self.shared_camera.isOpened():
+                     return self.shared_camera
+             except:
+                 self.shared_camera = None
+
+        max_attempts = 2
         for attempt in range(max_attempts):
-            # Try preferred index first, then probe others if it fails
             indices_to_try = [self.camera_index] + [i for i in range(5) if i != self.camera_index]
             
             for idx in indices_to_try:
-                # We use CAP_V4L2 for better compatibility/performance on Pi/Linux
-                cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
-                if cap.isOpened():
-                    # Set format to MJPG to reduce USB bandwidth and memory overhead
-                    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-                    
-                    # Set lower resolution immediately to save memory
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    # Set buffer size to 1 to avoid lag
-                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                    
-                    self.camera_index = idx # Remember working index
-                    return cap
+                # Try multiple backends: V4L2 first, then default
+                backends = [cv2.CAP_V4L2, cv2.CAP_ANY]
+                for backend in backends:
+                    try:
+                        logger.info(f"[PROBE] Trying index {idx} with backend {backend}")
+                        cap = cv2.VideoCapture(idx, backend)
+                        if cap.isOpened():
+                            # Set format to MJPEG
+                            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                            
+                            # Test if we can actually read a frame
+                            success, frame = cap.read()
+                            if success:
+                                logger.info(f"[SUCCESS] Camera {idx} is UP and providing frames.")
+                                self.camera_index = idx 
+                                self.shared_camera = cap
+                                return cap
+                            else:
+                                logger.warning(f"[FAIL] Camera {idx} opened but failed to read frame.")
+                                cap.release()
+                    except Exception as e:
+                        logger.warning(f"Error opening camera {idx}: {e}")
             
             if attempt < max_attempts - 1:
-                logger.warning(f"No camera found on attempt {attempt + 1}. Retrying in 2s...")
-                time.sleep(2.0)
+                time.sleep(1.0)
                 
         return None
 
     def capture_timelapse_frame(self):
         """Captures a single frame safely and saves it to the timelapse directory structure."""
-        if self.is_streaming:
-             logger.info("Skipping timelapse capture (Camera is being viewed live).")
-             return False
-
         today_str = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%H%M%S")
         
@@ -64,14 +97,27 @@ class CameraController:
         filepath = os.path.join(target_dir, filename)
 
         logger.info(f"Capturing timelapse frame: {filename}")
+        
+        camera = None
+        release_needed = False
+        
         try:
-            camera = self._get_camera()
+            with self.lock:
+                if self.shared_camera is not None and self.shared_camera.isOpened():
+                    camera = self.shared_camera
+                    release_needed = False # Don't release if it's shared/streaming
+                else:
+                    camera = self._get_camera()
+                    release_needed = True # Release if we opened it just for this
+            
             if camera is None:
                 logger.error("Could not find or open any camera for timelapse")
                 return False
                 
-            # Give camera a moment to adjust brightness/focus
-            time.sleep(1.0) 
+            # Give camera a moment to adjust brightness/focus if we just opened it
+            if release_needed:
+                time.sleep(1.0) 
+                
             success, frame = camera.read()
             
             if success:
@@ -81,7 +127,11 @@ class CameraController:
             else:
                 logger.error("Failed to read frame from camera")
             
-            camera.release()
+            if release_needed:
+                with self.lock:
+                    camera.release()
+                    self.shared_camera = None
+            
             return success
         except Exception as e:
             logger.error(f"Error capturing timelapse: {e}")
@@ -89,40 +139,60 @@ class CameraController:
 
     def generate_live_stream(self):
         """Generator for the MJPEG stream to serve to the web interface"""
-        logger.info("Starting live stream...")
-        self.is_streaming = True
+        with self.lock:
+            self.client_count += 1
+            self.is_streaming = True
+            logger.info(f"Client connected. Total clients: {self.client_count}")
         
-        camera = self._get_camera()
-        if camera is None:
-            logger.error("Could not find or open any camera for streaming")
-            self.is_streaming = False
-            return
-
+        camera = None
         try:
+            # Re-probing sometimes helps if the driver hung
+            with self.lock:
+                camera = self._get_camera()
+            
+            if camera is None:
+                logger.error("Could not find or open any camera for streaming")
+                yield (b'--frame\r\n'
+                       b'Content-Type: text/plain\r\n\r\n' + b'Camera Unavailable' + b'\r\n')
+                return
+
             retry_count = 0
             while self.is_streaming:
-                success, frame = camera.read()
+                # Thread-safe read
+                with self.lock:
+                    if self.shared_camera is None or not self.shared_camera.isOpened():
+                         break
+                    success, frame = self.shared_camera.read()
+                
                 if not success:
                     logger.warning(f"Failed to read frame during stream (retry {retry_count}/5)")
                     retry_count += 1
                     if retry_count > 5:
                         break
-                    time.sleep(0.5) # Give hardware a moment to recover
+                    time.sleep(0.5) 
                     continue
                 
-                retry_count = 0 # Reset on success
+                retry_count = 0
                 
-                # Compress heavily for the live web feed to save bandwidth
+                # Compress heavily for the live web feed
                 ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
                 frame_bytes = buffer.tobytes()
                 
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
                 
-                # drop FPS to save CPU on Pi Zero (approx 10 FPS)
-                time.sleep(0.1) 
+                # Cap FPS to ~10 to save memory and CPU on Pi Zero
+                time.sleep(0.1)
+        except Exception as e:
+            logger.error(f"Error in live stream generator: {e}")
         finally:
-            logger.info("Stopping live stream...")
-            self.is_streaming = False
-            if camera:
-                camera.release()
+            with self.lock:
+                self.client_count -= 1
+                logger.info(f"Client disconnected. Remaining clients: {self.client_count}")
+                if self.client_count <= 0:
+                    self.client_count = 0
+                    self.is_streaming = False
+                    if self.shared_camera:
+                        logger.info("Closing shared camera handle.")
+                        self.shared_camera.release()
+                        self.shared_camera = None

@@ -11,6 +11,9 @@ const app = {
         setInterval(() => {
             this.fetchStats();
             this.updateCharts();
+            if(document.getElementById('timelapse').classList.contains('active')) {
+                this.fetchCameraStatus();
+            }
         }, 30000);
     },
 
@@ -71,6 +74,11 @@ const app = {
 
                 if(target === 'history') {
                     this.loadFullHistory();
+                }
+
+                if(target === 'timelapse') {
+                    this.loadGallery();
+                    this.fetchCameraStatus();
                 }
             });
         });
@@ -275,12 +283,113 @@ const app = {
             const data = await res.json();
             if(data.status==='success') {
                  this.showToast(data.message);
+                 // Reload gallery if we are on the timelapse tab
+                 if(document.getElementById('timelapse').classList.contains('active')) {
+                     this.loadGallery();
+                 }
             } else {
                  throw new Error(data.message);
             }
         } catch(e) {
             this.showToast(e.message, true);
         }
+    },
+
+    async loadGallery() {
+        const container = document.getElementById('gallery-container');
+        try {
+            const res = await fetch('/api/timelapse/index');
+            if(!res.ok) throw new Error('Failed to fetch gallery index');
+            const data = await res.json();
+            
+            if(!data || data.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fa-solid fa-images"></i>
+                        <p>No images found yet. Captures happen every hour.</p>
+                        <p style="font-size: 0.8em; margin-top: 10px;">If you already took a "Manual Capture", check the camera health indicator above.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+            
+            data.forEach(cosecha => {
+                const cosechaEl = document.createElement('div');
+                cosechaEl.className = 'cosecha-group';
+                cosechaEl.innerHTML = `<h3><i class="fa-solid fa-folder-open"></i> ${cosecha.name}</h3>`;
+                
+                cosecha.dates.forEach(dateEntry => {
+                    const dateEl = document.createElement('div');
+                    dateEl.className = 'date-group';
+                    dateEl.innerHTML = `<h4>${dateEntry.date}</h4>`;
+                    
+                    const grid = document.createElement('div');
+                    grid.className = 'gallery-grid';
+                    
+                    dateEntry.images.forEach(img => {
+                        const card = document.createElement('div');
+                        card.className = 'image-card';
+                        card.onclick = () => this.openLightbox(img.url, `${cosecha.name} - ${dateEntry.date} ${img.timestamp}`);
+                        
+                        card.innerHTML = `
+                            <img src="${img.url}" alt="${img.name}" loading="lazy">
+                            <div class="img-info">${img.timestamp.match(/.{1,2}/g).join(':')}</div>
+                        `;
+                        grid.appendChild(card);
+                    });
+                    
+                    dateEl.appendChild(grid);
+                    cosechaEl.appendChild(dateEl);
+                });
+                
+                container.appendChild(cosechaEl);
+            });
+
+        } catch(e) {
+            console.error("Gallery load failed", e);
+            this.showToast("Failed to load image gallery", true);
+        }
+    },
+
+    openLightbox(url, caption) {
+        const lb = document.getElementById('lightbox');
+        const img = document.getElementById('lightbox-img');
+        const cap = document.getElementById('lightbox-caption');
+        
+        img.src = url;
+        cap.textContent = caption;
+        lb.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // Prevent scrolling
+    },
+
+    closeLightbox() {
+        const lb = document.getElementById('lightbox');
+        lb.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    },
+
+    async fetchCameraStatus() {
+        try {
+            const res = await fetch('/api/camera/status');
+            const data = await res.json();
+            
+            const dot = document.getElementById('cam-indicator');
+            const txt = document.getElementById('cam-status-text');
+            
+            if(!dot || !txt) return;
+
+            if(data.status === 'online') {
+                dot.className = 'indicator-dot online';
+                txt.textContent = `Camera Online (Index ${data.active_index})`;
+            } else {
+                dot.className = 'indicator-dot offline';
+                txt.textContent = data.available_indices.length > 0 
+                    ? `Camera Detected at ${data.available_indices.join(',')} but OFFLINE`
+                    : 'No Camera Detected';
+            }
+        } catch(e) { console.error("Failed to fetch camera status", e); }
     },
 
     async loadConfigToForm() {

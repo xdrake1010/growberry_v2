@@ -258,16 +258,36 @@
                 <!-- Timelapse Tab -->
                 <section id="timelapse" class="tab-content">
                     <div class="glass-panel">
-                        <h2>Timelapse Viewer</h2>
-                        <p>Timelapse images are automatically captured and saved to the configured directory in the Raspberry Pi filesystem.</p>
-                        <hr style="opacity:0.2; margin: 20px 0;">
-                        <button class="btn primary" onclick="app.captureFrame()">Force Capture Frame Now</button>
-                        <p style="margin-top:20px; font-size: 0.9em; opacity: 0.8;">Directory: <code>/home/growberry/timelapse/</code></p>
+                        <div class="gallery-toolbar">
+                            <div class="camera-health">
+                                <span class="indicator-dot" id="cam-indicator"></span>
+                                <span id="cam-status-text">Checking Camera...</span>
+                            </div>
+                            <div class="gallery-actions">
+                                <button class="btn secondary sm" onclick="app.loadGallery()"><i class="fa-solid fa-rotate"></i> Sync</button>
+                                <button class="btn primary sm" onclick="app.captureFrame()"><i class="fa-solid fa-camera"></i> Manual Capture</button>
+                            </div>
+                        </div>
+                        
+                        <div id="gallery-container" class="gallery-container">
+                            <!-- Categories and images will be injected here -->
+                            <div class="empty-state">
+                                <i class="fa-solid fa-images"></i>
+                                <p>No images found yet. Captures happen every hour.</p>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
             </div>
         </main>
+    </div>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox hidden" onclick="app.closeLightbox()">
+        <span class="close-lightbox">&times;</span>
+        <img id="lightbox-img" src="" alt="Full view">
+        <div id="lightbox-caption" class="lightbox-caption"></div>
     </div>
 
     <!-- Notification Toast -->

@@ -1,5 +1,5 @@
 import os
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, jsonify, request, Response, send_from_directory
 from Adafruit_DHT import DHT11, read_retry
 from config import GPIO_PINS, TIMELAPSE_BASE_DIR, load_plants_config, save_plants_config
 
@@ -92,6 +92,66 @@ def manual_timelapse_capture():
         return jsonify({"status": "success", "message": "Captured and saved."})
     return jsonify({"status": "error", "message": "Failed to capture frame."}), 500
 
+@api.route('/camera/status', methods=['GET'])
+def get_camera_status():
+    available = _system.camera_controller.check_available_cameras()
+    return jsonify({
+        "status": "online" if _system.camera_controller.shared_camera else "offline",
+        "active_index": _system.camera_controller.camera_index,
+        "available_indices": available,
+        "is_streaming": _system.camera_controller.is_streaming,
+        "client_count": _system.camera_controller.client_count
+    })
+
+@api.route('/timelapse/index', methods=['GET'])
+def list_timelapse_images():
+    """Returns a structured list of available images in data/timelapse"""
+    try:
+        data = []
+        if not os.path.exists(TIMELAPSE_BASE_DIR):
+            return jsonify([])
+            
+        for cosecha in sorted(os.listdir(TIMELAPSE_BASE_DIR)):
+            cosecha_path = os.path.join(TIMELAPSE_BASE_DIR, cosecha)
+            if not os.path.isdir(cosecha_path):
+                continue
+                
+            cosecha_data = {"name": cosecha, "dates": []}
+            
+            for date_folder in sorted(os.listdir(cosecha_path), reverse=True):
+                date_path = os.path.join(cosecha_path, date_folder)
+                if not os.path.isdir(date_path):
+                    continue
+                    
+                images = []
+                for img in sorted(os.listdir(date_path), reverse=True):
+                    if img.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        # Relative path for the view route
+                        rel_path = f"{cosecha}/{date_folder}/{img}"
+                        images.append({
+                            "name": img,
+                            "url": f"/api/timelapse/image/{rel_path}",
+                            "timestamp": img.split('.')[0]
+                        })
+                
+                if images:
+                    cosecha_data["dates"].append({
+                        "date": date_folder,
+                        "images": images
+                    })
+            
+            if cosecha_data["dates"]:
+                data.append(cosecha_data)
+                
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api.route('/timelapse/image/<path:filename>', methods=['GET'])
+def view_timelapse_image(filename):
+    """Serves an image from the TIMELAPSE_BASE_DIR"""
+    return send_from_directory(TIMELAPSE_BASE_DIR, filename)
+
 @api.route('/configs', methods=['GET'])
 def get_configs():
     return jsonify(load_plants_config())
@@ -103,6 +163,8 @@ def set_configs():
     
     # Hot-reload system 
     _system.config_data = new_data
+    _system.active_cosecha = new_data.get("active_cosecha", "default")
+    _system.camera_controller.set_cosecha_name(_system.active_cosecha)
     _system.schedule_manager.reload_config(new_data)
     _system.schedule_manager.refresh_schedule()
     return jsonify({"status": "success", "message": "Config updated"})
