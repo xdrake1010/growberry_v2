@@ -168,6 +168,7 @@ def set_configs():
     _system.camera_controller.set_cosecha_name(_system.active_cosecha)
     _system.schedule_manager.reload_config(new_data)
     _system.schedule_manager.refresh_schedule()
+    _system.rebuild_scheduler() # Apply dynamic background tasks
     return jsonify({"status": "success", "message": "Config updated"})
 
 @api.route('/history', methods=['GET'])

@@ -130,16 +130,22 @@ const app = {
                 fetch('/api/history?sensor=humidity&limit=50')
             ]);
             
+            const parseDate = (isoStr) => {
+                if(!isoStr) return "";
+                const t = isoStr.split(/[- : T .]/);
+                return `${t[3]}:${t[4]}`; // HH:MM
+            };
+
             if (tempRes.ok) {
                 const temps = await tempRes.json();
-                this.tempChart.data.labels = temps.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                this.tempChart.data.labels = temps.map(d => parseDate(d.timestamp));
                 this.tempChart.data.datasets[0].data = temps.map(d => d.value);
                 this.tempChart.update('none');
             }
 
             if (humRes.ok) {
                 const hums = await humRes.json();
-                this.humChart.data.labels = hums.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                this.humChart.data.labels = hums.map(d => parseDate(d.timestamp));
                 this.humChart.data.datasets[0].data = hums.map(d => d.value);
                 this.humChart.update('none');
             }
@@ -467,6 +473,9 @@ const app = {
             if (document.getElementById('cfg-timelapse-interval')) {
                 document.getElementById('cfg-timelapse-interval').value = data.timelapse_interval_minutes || 60;
             }
+            if (document.getElementById('cfg-timelapse-enabled')) {
+                document.getElementById('cfg-timelapse-enabled').checked = data.timelapse_enabled !== false;
+            }
             
             this.renderHarvestData(data.active_cosecha || 'default');
 
@@ -570,11 +579,11 @@ const app = {
         const today = local.toISOString().split('T')[0];
         document.getElementById('cfg-start-date').value = today;
     },
-
     async generateAndSaveConfig() {
         const cosechaName = document.getElementById('cfg-cosecha-name').value;
         const startDate = document.getElementById('cfg-start-date').value;
         const timelapseInterval = parseInt(document.getElementById('cfg-timelapse-interval').value) || 60;
+        const timelapseEnabled = document.getElementById('cfg-timelapse-enabled').checked;
         
         if(!cosechaName) {
             this.showToast("Please provide a name for the Cosecha", true);
@@ -584,6 +593,7 @@ const app = {
         const newConfig = JSON.parse(JSON.stringify(this.fullConfig));
         newConfig.active_cosecha = cosechaName;
         newConfig.timelapse_interval_minutes = timelapseInterval;
+        newConfig.timelapse_enabled = timelapseEnabled;
 
         const cycles = [];
         document.querySelectorAll('.cycle-item').forEach(item => {
