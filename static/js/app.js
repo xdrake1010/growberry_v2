@@ -692,68 +692,80 @@ const app = {
         document.getElementById('cfg-start-date').value = today;
     },
     async generateAndSaveConfig() {
-        const cosechaName = document.getElementById('cfg-cosecha-name').value;
-        const startDate = document.getElementById('cfg-start-date').value;
-        const timelapseInterval = parseInt(document.getElementById('cfg-timelapse-interval').value) || 60;
-        const timelapseEnabled = document.getElementById('cfg-timelapse-enabled').checked;
-        
-        if(!cosechaName) {
-            this.showToast("Please provide a name for the Cosecha", true);
-            return;
-        }
-
-        const newConfig = JSON.parse(JSON.stringify(this.fullConfig));
-        newConfig.active_cosecha = cosechaName;
-        newConfig.timelapse_interval_minutes = timelapseInterval;
-        newConfig.timelapse_enabled = timelapseEnabled;
-
-        const cycles = [];
-        document.querySelectorAll('.cycle-item').forEach(item => {
-            const name = item.querySelector('.cyc-name').value;
-            if(!name) return;
+        try {
+            const cosechaName = document.getElementById('cfg-cosecha-name').value;
+            const startDate = document.getElementById('cfg-start-date').value;
+            const logInterval = parseInt(document.getElementById('cfg-log-interval').value) || 1;
             
-            const selectedDays = [];
-            item.querySelectorAll('.cyc-days:checked').forEach(cb => selectedDays.push(parseInt(cb.value)));
+            // Timelapse settings from the form (not the mini-toggle)
+            const timelapseInterval = parseInt(document.getElementById('cfg-timelapse-interval').value) || 60;
+            const timelapseEnabled = document.getElementById('cfg-timelapse-enabled').checked;
+            
+            if(!cosechaName) {
+                this.showToast("Please provide a name for the Cosecha", true);
+                return;
+            }
 
-            cycles.push({
-                name: name,
-                duration_days: parseInt(item.querySelector('.cyc-duration').value),
-                initial_time: parseInt(item.querySelector('.cyc-light-start').value),
-                total_hours: parseInt(item.querySelector('.cyc-hours').value),
-                target_total_hours: parseInt(item.querySelector('.cyc-target-hours').value),
+            // Create a deep copy to manipulate safely
+            const updatedConfig = JSON.parse(JSON.stringify(this.fullConfig));
+            
+            // Global settings
+            updatedConfig.active_cosecha = cosechaName;
+            updatedConfig.timelapse_interval_minutes = timelapseInterval;
+            updatedConfig.timelapse_enabled = timelapseEnabled;
+            updatedConfig.sensor_log_interval_minutes = logInterval;
+
+            // Harvest Plan Cycles
+            const cycles = [];
+            document.querySelectorAll('.cycle-item').forEach(item => {
+                const name = item.querySelector('.cyc-name').value;
+                if(!name) return;
                 
-                ultra_red_step_mins: parseInt(item.querySelector('.cyc-red-step').value),
-                infra_blue_step_mins: parseInt(item.querySelector('.cyc-blue-step').value),
-                
-                ultra_red_sunrise: item.querySelector('.cyc-rs').checked,
-                ultra_red_full: item.querySelector('.cyc-rf').checked,
-                infra_blue_sunrise: item.querySelector('.cyc-bs').checked,
-                infra_blue_full: item.querySelector('.cyc-bf').checked,
-                
-                irrigation_start_time: item.querySelector('.cyc-irr-start').value,
-                irrigation_timer: parseInt(item.querySelector('.cyc-irr-timer').value),
-                target_volume_liters: parseFloat(item.querySelector('.cyc-volume').value),
-                watering_days: selectedDays,
-                multiplier: 1,
-                tank_time: 15
+                const selectedDays = [];
+                item.querySelectorAll('.cyc-days:checked').forEach(cb => selectedDays.push(parseInt(cb.value)));
+
+                cycles.push({
+                    name: name,
+                    duration_days: parseInt(item.querySelector('.cyc-duration').value) || 1,
+                    initial_time: parseInt(item.querySelector('.cyc-light-start').value) || 8,
+                    total_hours: parseInt(item.querySelector('.cyc-hours').value) || 12,
+                    target_total_hours: parseInt(item.querySelector('.cyc-target-hours').value) || 12,
+                    ultra_red_step_mins: parseInt(item.querySelector('.cyc-red-step').value) || 15,
+                    infra_blue_step_mins: parseInt(item.querySelector('.cyc-blue-step').value) || 15,
+                    ultra_red_sunrise: item.querySelector('.cyc-rs').checked,
+                    ultra_red_full: item.querySelector('.cyc-rf').checked,
+                    infra_blue_sunrise: item.querySelector('.cyc-bs').checked,
+                    infra_blue_full: item.querySelector('.cyc-bf').checked,
+                    irrigation_start_time: item.querySelector('.cyc-irr-start').value || "08:00",
+                    irrigation_timer: parseInt(item.querySelector('.cyc-irr-timer').value) || 15,
+                    target_volume_liters: parseFloat(item.querySelector('.cyc-volume').value) || 0,
+                    watering_days: selectedDays,
+                    multiplier: 1,
+                    tank_time: 15
+                });
             });
-        });
 
-        // Ensure we preserve other plants
-        if(!this.fullConfig.plants) this.fullConfig.plants = {};
-        
-        this.fullConfig.active_cosecha = cosechaName;
-        this.fullConfig.plants[cosechaName] = { 
-            name: cosechaName, 
-            start_date: startDate, 
-            cycles: cycles 
-        };
-        
-        this.fullConfig.sensor_log_interval_minutes = parseInt(document.getElementById('cfg-log-interval').value) || 1;
+            if(!updatedConfig.plants) updatedConfig.plants = {};
+            updatedConfig.plants[cosechaName] = { 
+                name: cosechaName, 
+                start_date: startDate, 
+                cycles: cycles 
+            };
 
-        this.configEditor.value = JSON.stringify(this.fullConfig, null, 4);
-        await this.saveConfig();
-        this.loadConfigToForm(); // Update selector list
+            // Sync back to internal state and JSON editor
+            this.fullConfig = updatedConfig;
+            this.configEditor.value = JSON.stringify(this.fullConfig, null, 4);
+            
+            await this.saveConfig();
+            this.showToast("Harvest Plan saved successfully!");
+            
+            // Refresh form to reflect changes (especially if we renamed cosecha)
+            await this.loadConfigToForm();
+            
+        } catch(e) {
+            console.error("Critical error in generateAndSaveConfig", e);
+            this.showToast("Failed to save Harvest Plan: " + e.message, true);
+        }
     },
 
     toggleAdvancedMode() {

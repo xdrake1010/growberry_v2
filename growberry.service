@@ -3,7 +3,7 @@ Description=Growberry Automated Cultivation System
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/python3 app.py
+ExecStart=/home/xdrake/growberry_v2/venv/bin/python app.py
 WorkingDirectory=/home/xdrake/growberry_v2
 StandardOutput=inherit
 StandardError=inherit

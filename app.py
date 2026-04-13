@@ -69,30 +69,25 @@ class ApplicationSystem:
         self.sensor_data = {"temperature": None, "humidity": None, "last_update": None}
         
         self.lock = threading.Lock()
+        self.scheduler_lock = threading.Lock()
         logger.info("System Initialized Successfully.")
         
-    def rebuild_scheduler(self):
-        """Standardized method to initialize or refresh all background scheduled tasks."""
-        logger.info("[SCHEDULER] Rebuilding background tasks...")
-        
-        # Clear existing jobs if any (using tags for precision)
-        schedule.clear('background_tasks')
-
-        # 1. Daily refresh (Cycle phase verification)
-        schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule).tag('background_tasks')
 
     def log_sensors(self):
         """Saves current cached sensor data to the database for history."""
-        with self.lock:
-            t = self.sensor_data.get("temperature")
-            h = self.sensor_data.get("humidity")
-        
-        if t is not None and h is not None:
-            self.db_manager.save_measurement("temperature", t)
-            self.db_manager.save_measurement("humidity", h)
-            logger.info(f"Historical Log: T={t}C, H={h}% saved to DB.")
-        else:
-            logger.warning("Historical Log skipped: No sensor data in cache.")
+        try:
+            with self.lock:
+                t = self.sensor_data.get("temperature")
+                h = self.sensor_data.get("humidity")
+            
+            if t is not None and h is not None:
+                self.db_manager.save_measurement("temperature", t)
+                self.db_manager.save_measurement("humidity", h)
+                logger.info(f"Historical Log: T={t}C, H={h}% saved to DB.")
+            else:
+                logger.warning("Historical Log skipped: No sensor data in cache yet.")
+        except Exception as e:
+            logger.error(f"Error in log_sensors: {e}")
 
     def scheduled_timelapse(self, is_manual=False):
         """Capture a timelapse frame with current sensor metadata, handling night flash if needed."""
@@ -130,26 +125,27 @@ class ApplicationSystem:
         """Standardized method to initialize or refresh all background scheduled tasks."""
         logger.info("[SCHEDULER] Rebuilding background tasks...")
         
-        # Clear existing jobs if any (using tags for precision)
-        schedule.clear('background_tasks')
+        with self.scheduler_lock:
+            # Clear existing jobs if any (using tags for precision)
+            schedule.clear('background_tasks')
 
-        # 1. Daily refresh (Cycle phase verification)
-        schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule).tag('background_tasks')
+            # 1. Daily refresh (Cycle phase verification)
+            schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule).tag('background_tasks')
 
-        # 2. Sequential Sensor Logging for History (Custom Interval)
-        log_interval = self.config_data.get("sensor_log_interval_minutes", 1)
-        schedule.every(log_interval).minutes.do(self.log_sensors).tag('background_tasks')
-        logger.info(f"[SCHEDULER] Sensor logging enabled every {log_interval} minutes.")
+            # 2. Sequential Sensor Logging for History (Custom Interval)
+            log_interval = self.config_data.get("sensor_log_interval_minutes", 1)
+            schedule.every(log_interval).minutes.do(self.log_sensors).tag('background_tasks')
+            logger.info(f"[SCHEDULER] Sensor logging enabled every {log_interval} minutes.")
 
-        # 3. Dynamic Timelapse Capture
-        enabled = self.config_data.get("timelapse_enabled", True)
-        interval = self.config_data.get("timelapse_interval_minutes", 60)
-        
-        if enabled:
-            schedule.every(interval).minutes.do(lambda: self.scheduled_timelapse(is_manual=False)).tag('background_tasks')
-            logger.info(f"[SCHEDULER] Automatic timelapse enabled every {interval} minutes.")
-        else:
-            logger.info("[SCHEDULER] Automatic timelapse is DISABLED.")
+            # 3. Dynamic Timelapse Capture
+            enabled = self.config_data.get("timelapse_enabled", True)
+            interval = self.config_data.get("timelapse_interval_minutes", 60)
+            
+            if enabled:
+                schedule.every(interval).minutes.do(lambda: self.scheduled_timelapse(is_manual=False)).tag('background_tasks')
+                logger.info(f"[SCHEDULER] Automatic timelapse enabled every {interval} minutes.")
+            else:
+                logger.info("[SCHEDULER] Automatic timelapse is DISABLED.")
 
     def daemon_loop(self):
         logger.info("Starting background daemon thread...")
@@ -184,12 +180,12 @@ class ApplicationSystem:
         
         while True:
             try:
-                # IMPORTANT: Run pending WITHOUT the global lock to avoid deadlock
-                # inside scheduled jobs like log_sensors() which try to acquire self.lock
-                schedule.run_pending()
+                # IMPORTANT: Run pending with a lock to avoid corruption from Flask threads
+                with self.scheduler_lock:
+                    schedule.run_pending()
             except Exception as e:
                 logger.error(f"Error in daemon loop: {e}")
-            time.sleep(10) # 10s resolution is enough for 15+ min tasks
+            time.sleep(10) # 10s resolution is enough for 1+ min tasks
 
 system = ApplicationSystem()
 init_routes(system)
