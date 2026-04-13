@@ -24,6 +24,9 @@ CORS(app)
 class ApplicationSystem:
     def __init__(self):
         logger.info("Initializing Application System...")
+        self.lock = threading.Lock()
+        self.scheduler_lock = threading.Lock()
+        
         # Initialize GPIO globally and set up pins
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
@@ -69,8 +72,6 @@ class ApplicationSystem:
         # Sensor Cache
         self.sensor_data = {"temperature": None, "humidity": None, "last_update": None}
         
-        self.lock = threading.Lock()
-        self.scheduler_lock = threading.Lock()
         logger.info("System Initialized Successfully.")
         
 
