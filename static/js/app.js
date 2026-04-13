@@ -261,6 +261,51 @@ const app = {
         }
     },
 
+    renderTimeline(c) {
+        if (!c || !c.all_cycles) return;
+        
+        const totalJourneyDays = c.all_cycles.reduce((sum, cycle) => sum + cycle.duration, 0);
+        const currentJourneyDay = c.total_days || 0;
+        
+        const daysInfoEl = document.getElementById('total-days-info');
+        if (daysInfoEl) daysInfoEl.textContent = `Day ${currentJourneyDay} of ${totalJourneyDays}`;
+        
+        const bar = document.getElementById('timeline-bar');
+        const labels = document.getElementById('timeline-labels');
+        const marker = document.getElementById('timeline-marker');
+        
+        if (!bar || !labels || !marker) return;
+
+        // Clear previous segments and labels (except marker)
+        Array.from(bar.children).forEach(child => { if(child !== marker) child.remove(); });
+        labels.innerHTML = '';
+        
+        let accumulatedDays = 0;
+        c.all_cycles.forEach((cycle, index) => {
+            const widthPerc = (cycle.duration / totalJourneyDays) * 100;
+            const startPerc = (accumulatedDays / totalJourneyDays) * 100;
+            
+            // Segment
+            const seg = document.createElement('div');
+            seg.className = `timeline-segment seg-${index % 5}`;
+            seg.style.width = `${widthPerc}%`;
+            bar.insertBefore(seg, marker);
+            
+            // Label
+            const lbl = document.createElement('div');
+            lbl.className = 'timeline-label';
+            lbl.textContent = cycle.name;
+            lbl.style.left = `${startPerc + (widthPerc / 2)}%`;
+            labels.appendChild(lbl);
+            
+            accumulatedDays += cycle.duration;
+        });
+        
+        // Position Needle
+        const markerPos = Math.min((currentJourneyDay / totalJourneyDays) * 100, 100);
+        marker.style.left = `${markerPos}%`;
+    },
+
     updateBadge(id, state) {
         const el = document.getElementById(id);
         if(state) {
