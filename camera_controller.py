@@ -50,7 +50,7 @@ class CameraController:
              except:
                  self.shared_camera = None
 
-        max_attempts = 2
+        max_attempts = 5
         for attempt in range(max_attempts):
             indices_to_try = [self.camera_index] + [i for i in range(5) if i != self.camera_index]
             
