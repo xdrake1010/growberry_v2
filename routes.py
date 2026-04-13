@@ -2,6 +2,7 @@ import os
 from flask import Blueprint, jsonify, request, Response, send_from_directory
 from Adafruit_DHT import DHT11, read_retry
 from config import GPIO_PINS, TIMELAPSE_BASE_DIR, load_plants_config, save_plants_config
+from video_generator import EXPORTS_DIR
 
 api = Blueprint('api', __name__)
 _system = None
@@ -175,3 +176,20 @@ def get_history():
     limit = request.args.get('limit', default=48, type=int) # 48 entries x 15 mins = 12 hours
     history = _system.db_manager.get_history(sensor, limit)
     return jsonify(history)
+
+@api.route('/timelapse/export', methods=['POST'])
+def export_timelapse():
+    cosecha = request.json.get('cosecha', _system.active_cosecha)
+    fps = request.json.get('fps', 10)
+    success, message = _system.video_generator.export_cosecha(cosecha, fps)
+    if success:
+        return jsonify({"status": "success", "message": message})
+    return jsonify({"status": "error", "message": message}), 400
+
+@api.route('/timelapse/exports', methods=['GET'])
+def list_exports():
+    return jsonify(_system.video_generator.list_exports())
+
+@api.route('/timelapse/download/<filename>', methods=['GET'])
+def download_video(filename):
+    return send_from_directory(EXPORTS_DIR, filename, as_attachment=True)

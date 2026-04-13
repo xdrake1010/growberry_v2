@@ -11,6 +11,7 @@ from hardware_controllers import LEDController, VentilationController, TankContr
 from schedule_controller import ScheduleManager
 from camera_controller import CameraController
 from database_manager import DatabaseManager
+from video_generator import VideoGenerator
 from config import GPIO_PINS, load_plants_config, save_plants_config, setup_logging
 
 # Initialize logging
@@ -62,6 +63,7 @@ class ApplicationSystem:
             self.config_data
         )
         self.camera_controller = CameraController(cosecha_name=self.active_cosecha)
+        self.video_generator = VideoGenerator()
         
         # Sensor Cache
         self.sensor_data = {"temperature": None, "humidity": None, "last_update": None}
@@ -74,20 +76,35 @@ class ApplicationSystem:
         # Initial schedule setup
         self.schedule_manager.refresh_schedule()
         
-        # Every hour, capture timelapse frame
-        schedule.every(1).hours.do(self.camera_controller.capture_timelapse_frame)
-        
         # Every day, we verify if cycle phase needs to be updated
         schedule.every().day.at("00:01").do(self.schedule_manager.refresh_schedule)
         
-        # Every 15 minutes, save sensor data to DB
+        # Every X minutes, capture timelapse frame with metadata
+        interval = self.config_data.get("timelapse_interval_minutes", 60)
+        
+        def scheduled_timelapse():
+            with self.lock:
+                metadata = {
+                    "temp": self.sensor_data.get("temperature"),
+                    "hum": self.sensor_data.get("humidity"),
+                    "harvest": self.active_cosecha
+                }
+            self.camera_controller.capture_timelapse_frame(metadata=metadata)
+
+        schedule.every(interval).minutes.do(scheduled_timelapse)
+        
+        # Every 15 minutes, save sensor data from cache to DB for history
         def log_sensors():
-            from Adafruit_DHT import DHT11, read_retry
-            h, t = read_retry(DHT11, GPIO_PINS["dht11_sensor"])
+            with self.lock:
+                t = self.sensor_data.get("temperature")
+                h = self.sensor_data.get("humidity")
+            
             if t is not None and h is not None:
                 self.db_manager.save_measurement("temperature", t)
                 self.db_manager.save_measurement("humidity", h)
-                logger.info(f"Log: T={t}C, H={h}% saved to DB.")
+                logger.info(f"Historical Log: T={t}C, H={h}% saved to DB.")
+            else:
+                logger.warning("Historical Log skipped: No sensor data in cache.")
 
         schedule.every(15).minutes.do(log_sensors)
         # Initial log on startup

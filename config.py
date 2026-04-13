@@ -40,6 +40,7 @@ def get_default_config():
     """Returns the hardcoded default 'Standard Mix' harvest plan with 4 phases and gradual reduction (List format)."""
     return {
         "active_cosecha": "Standard_Mix",
+        "timelapse_interval_minutes": 60,
         "plants": {
             "Standard_Mix": {
                 "name": "Standard Mix",

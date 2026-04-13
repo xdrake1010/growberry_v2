@@ -3,6 +3,7 @@ import os
 import time
 import logging
 import threading
+import numpy as np
 from datetime import datetime
 from config import TIMELAPSE_BASE_DIR
 
@@ -85,7 +86,48 @@ class CameraController:
                 
         return None
 
-    def capture_timelapse_frame(self):
+    def _draw_metadata_overlay(self, frame, metadata):
+        """Draws a professional semi-transparent legend at the bottom of the frame."""
+        try:
+            h, w = frame.shape[:2]
+            overlay = frame.copy()
+            
+            # Bottom bar setup
+            bar_height = int(h * 0.08)
+            cv2.rectangle(overlay, (0, h - bar_height), (w, h), (0, 0, 0), -1)
+            
+            # Blend the black bar for semi-transparency
+            alpha = 0.5
+            frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+            
+            # Text properties
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = h / 1000.0 * 0.7
+            font_color = (255, 255, 255)
+            thickness = 1
+            
+            # Content
+            harvest_name = metadata.get("harvest", self.cosecha_name).upper()
+            temp = f"{metadata.get('temp', '--')}C"
+            hum = f"{metadata.get('hum', '--')}%"
+            time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
+            # Draw Left: Harvest Name
+            cv2.putText(frame, f"GROWBERRY | {harvest_name}", (20, h - int(bar_height/2) + 5), 
+                        font, font_scale, font_color, thickness, cv2.LINE_AA)
+            
+            # Draw Right: Stats
+            stats_str = f"{temp} | {hum} | {time_str}"
+            text_size = cv2.getTextSize(stats_str, font, font_scale, thickness)[0]
+            cv2.putText(frame, stats_str, (w - text_size[0] - 20, h - int(bar_height/2) + 5), 
+                        font, font_scale, font_color, thickness, cv2.LINE_AA)
+            
+            return frame
+        except Exception as e:
+            logger.error(f"Error drawing overlay: {e}")
+            return frame
+
+    def capture_timelapse_frame(self, metadata=None):
         """Captures a single frame safely and saves it to the timelapse directory structure."""
         today_str = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%H%M%S")
@@ -121,9 +163,13 @@ class CameraController:
             success, frame = camera.read()
             
             if success:
+                # Apply metadata burn-in if provided
+                if metadata:
+                    frame = self._draw_metadata_overlay(frame, metadata)
+
                 # Save with good quality for timelapse
-                cv2.imwrite(filepath, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
-                logger.info(f"Saved timelapse frame to {filepath}")
+                cv2.imwrite(filepath, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+                logger.info(f"Saved timelapse frame with metadata to {filepath}")
             else:
                 logger.error("Failed to read frame from camera")
             

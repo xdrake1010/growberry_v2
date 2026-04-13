@@ -231,6 +231,17 @@
                                 </div>
                             </div>
 
+                            <hr style="opacity:0.1; margin:10px 0;">
+                            <div class="cycles-header">
+                                <h3>Global Settings</h3>
+                            </div>
+                            <div class="input-group">
+                                <label>Timelapse Frequency (Minutes)</label>
+                                <input type="number" id="cfg-timelapse-interval" placeholder="Default: 60" min="1" max="1440">
+                            </div>
+
+                            <hr style="opacity:0.1; margin:10px 0;">
+
                             <div class="cycles-editor">
                                 <div class="cycles-header">
                                     <h3>Cultivation Cycles</h3>
@@ -265,7 +276,15 @@
                             </div>
                             <div class="gallery-actions">
                                 <button class="btn secondary sm" onclick="app.loadGallery()"><i class="fa-solid fa-rotate"></i> Sync</button>
+                                <button class="btn secondary sm" onclick="app.exportTimelapse()"><i class="fa-solid fa-video"></i> Create Video</button>
                                 <button class="btn primary sm" onclick="app.captureFrame()"><i class="fa-solid fa-camera"></i> Manual Capture</button>
+                            </div>
+                        </div>
+
+                        <div id="exports-container" class="exports-list hidden">
+                            <h4><i class="fa-solid fa-file-video"></i> Generated Videos</h4>
+                            <div id="exports-list" class="exports-grid">
+                                <!-- MP4 files will be listed here -->
                             </div>
                         </div>
                         

@@ -297,6 +297,7 @@ const app = {
 
     async loadGallery() {
         const container = document.getElementById('gallery-container');
+        this.loadExports(); // Also load video history
         try {
             const res = await fetch('/api/timelapse/index');
             if(!res.ok) throw new Error('Failed to fetch gallery index');
@@ -351,6 +352,56 @@ const app = {
             console.error("Gallery load failed", e);
             this.showToast("Failed to load image gallery", true);
         }
+    },
+
+    async exportTimelapse() {
+        this.showToast("Starting video generation. This may take several minutes...", false);
+        try {
+            const res = await fetch('/api/timelapse/export', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ cosecha: this.active_cosecha, fps: 10 })
+            });
+            const data = await res.json();
+            if(data.status === 'success') {
+                this.showToast(data.message);
+                setTimeout(() => this.loadExports(), 5000); // Check after 5s
+            } else {
+                throw new Error(data.message);
+            }
+        } catch(e) {
+            this.showToast(e.message, true);
+        }
+    },
+
+    async loadExports() {
+        const container = document.getElementById('exports-container');
+        const list = document.getElementById('exports-list');
+        try {
+            const res = await fetch('/api/timelapse/exports');
+            const data = await res.json();
+            
+            if(!data || data.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            list.innerHTML = '';
+            
+            data.forEach(video => {
+                const el = document.createElement('div');
+                el.className = 'export-item glass-panel sm';
+                el.innerHTML = `
+                    <div class="video-info">
+                        <strong>${video.name}</strong>
+                        <span>${video.date} • ${video.size}</span>
+                    </div>
+                    <a href="/api/timelapse/download/${video.name}" class="btn primary sm"><i class="fa-solid fa-download"></i></a>
+                `;
+                list.appendChild(el);
+            });
+        } catch(e) { console.error("Failed to load exports", e); }
     },
 
     openLightbox(url, caption) {
@@ -411,7 +462,12 @@ const app = {
                 if(name === data.active_cosecha) opt.selected = true;
                 this.harvestSelector.appendChild(opt);
             });
-
+            
+            // Set global interval
+            if (document.getElementById('cfg-timelapse-interval')) {
+                document.getElementById('cfg-timelapse-interval').value = data.timelapse_interval_minutes || 60;
+            }
+            
             this.renderHarvestData(data.active_cosecha || 'default');
 
         } catch(e) { console.error("Failed loading config into form", e); }
@@ -518,11 +574,16 @@ const app = {
     async generateAndSaveConfig() {
         const cosechaName = document.getElementById('cfg-cosecha-name').value;
         const startDate = document.getElementById('cfg-start-date').value;
+        const timelapseInterval = parseInt(document.getElementById('cfg-timelapse-interval').value) || 60;
         
         if(!cosechaName) {
             this.showToast("Please provide a name for the Cosecha", true);
             return;
         }
+
+        const newConfig = JSON.parse(JSON.stringify(this.fullConfig));
+        newConfig.active_cosecha = cosechaName;
+        newConfig.timelapse_interval_minutes = timelapseInterval;
 
         const cycles = [];
         document.querySelectorAll('.cycle-item').forEach(item => {
