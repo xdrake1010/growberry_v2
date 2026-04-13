@@ -1,22 +1,24 @@
-const app = {
     init() {
-        this.cacheDOM();
-        this.bindEvents();
-        this.initMobileMenu();
-        this.startClock();
-        this.fetchStats();
-        this.initCharts();
+        console.log("Growberry App initializing...");
+        try { this.cacheDOM(); } catch(e) { console.error("DOM Cache failed", e); }
+        try { this.bindEvents(); } catch(e) { console.error("Events binding failed", e); }
+        try { this.initMobileMenu(); } catch(e) { console.error("Mobile menu failed", e); }
+        try { this.startClock(); } catch(e) { console.error("Clock failed", e); }
+        try { this.initCharts(); } catch(e) { console.error("Charts failed", e); }
         
-        this.galleryState = { cosecha: null, date: null, rawData: [] };
-        
-        // Refresh stats and charts every 30 seconds (matches sensor cache)
-        setInterval(() => {
+        try {
+            this.galleryState = { cosecha: null, date: null, rawData: [] };
             this.fetchStats();
-            this.updateCharts();
-            if(document.getElementById('timelapse').classList.contains('active')) {
-                this.fetchCameraStatus();
-            }
-        }, 30000);
+            
+            // Refresh stats and charts every 30 seconds
+            setInterval(() => {
+                this.fetchStats();
+                this.updateCharts();
+                if(document.getElementById('timelapse') && document.getElementById('timelapse').classList.contains('active')) {
+                    this.fetchCameraStatus();
+                }
+            }, 30000);
+        } catch(e) { console.error("Main loop failed", e); }
     },
 
     initMobileMenu() {
@@ -95,7 +97,10 @@ const app = {
                 x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
             },
             plugins: { legend: { display: false } },
-            elements: { line: { tension: 0.4 }, point: { radius: 0 } }
+            elements: { 
+                line: { tension: 0.4 }, 
+                point: { radius: 4, hitRadius: 10, hoverRadius: 6 } // Increased for visibility
+            }
         };
 
         this.tempChart = new Chart(document.getElementById('tempChart'), {
@@ -134,8 +139,10 @@ const app = {
             
             const parseDate = (isoStr) => {
                 if(!isoStr) return "";
-                const t = isoStr.split(/[- : T .]/);
-                return `${t[3]}:${t[4]}`; // HH:MM
+                const parts = isoStr.split(/[T.Z\-\s:]/);
+                // Safe extraction of HH:MM (usually indices 3 and 4)
+                if (parts.length < 5) return isoStr; 
+                return `${parts[3]}:${parts[4]}`;
             };
 
             if (tempRes.ok) {
@@ -223,22 +230,22 @@ const app = {
             if(data.cycle_info && data.cycle_info.status === 'active') {
                 const c = data.cycle_info;
                 const hoursTxt = c.current_light_hours ? ` (${c.current_light_hours}h)` : '';
-                cycleEl.textContent = `${c.current_cycle.toUpperCase()}${hoursTxt}`;
+                cycleEl.textContent = `${(c.current_cycle || 'active').toUpperCase()}${hoursTxt}`;
                 
-                document.getElementById('cyc-elapsed').textContent = c.days_elapsed;
-                document.getElementById('cyc-rem').textContent = c.days_remaining;
+                if (document.getElementById('cyc-elapsed')) document.getElementById('cyc-elapsed').textContent = c.days_elapsed || 0;
+                if (document.getElementById('cyc-rem')) document.getElementById('cyc-rem').textContent = c.days_remaining || 0;
                 
-                const total = c.days_elapsed + c.days_remaining;
-                const perc = (c.days_elapsed / total) * 100;
-                document.getElementById('cyc-progress').style.width = `${perc}%`;
+                const total = (c.days_elapsed || 0) + (c.days_remaining || 0);
+                const perc = total > 0 ? ((c.days_elapsed || 0) / total) * 100 : 0;
+                if (document.getElementById('cyc-progress')) document.getElementById('cyc-progress').style.width = `${perc}%`;
                 
-                document.getElementById('cyc-start').textContent = c.cycle_start_date.split('T')[0];
-                document.getElementById('cyc-end').textContent = c.cycle_end_date.split('T')[0];
+                if (c.cycle_start_date && document.getElementById('cyc-start')) document.getElementById('cyc-start').textContent = c.cycle_start_date.split('T')[0];
+                if (c.cycle_end_date && document.getElementById('cyc-end')) document.getElementById('cyc-end').textContent = c.cycle_end_date.split('T')[0];
             } else {
-                cycleEl.textContent = 'INACTIVE';
-                document.getElementById('cyc-elapsed').textContent = '0';
-                document.getElementById('cyc-rem').textContent = '0';
-                document.getElementById('cyc-progress').style.width = '0%';
+                if (cycleEl) cycleEl.textContent = 'INACTIVE';
+                if (document.getElementById('cyc-elapsed')) document.getElementById('cyc-elapsed').textContent = '0';
+                if (document.getElementById('cyc-rem')) document.getElementById('cyc-rem').textContent = '0';
+                if (document.getElementById('cyc-progress')) document.getElementById('cyc-progress').style.width = '0%';
             }
 
         } catch (e) {
