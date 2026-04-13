@@ -95,14 +95,28 @@ class ApplicationSystem:
             logger.warning("Historical Log skipped: No sensor data in cache.")
 
     def scheduled_timelapse(self):
-        """Capture a timelapse frame with current sensor metadata."""
+        """Capture a timelapse frame with current sensor metadata, handling night flash if needed."""
         with self.lock:
-            metadata = {
-                "temp": self.sensor_data.get("temperature"),
-                "hum": self.sensor_data.get("humidity"),
-                "harvest": self.active_cosecha
-            }
-        self.camera_controller.capture_timelapse_frame(metadata=metadata)
+            temp = self.sensor_data.get("temperature")
+            hum = self.sensor_data.get("humidity")
+            harvest = self.active_cosecha
+        
+        # Flash logic: if all lights are off, pulse main white for 2 seconds
+        restore_main = False
+        all_states = self.led_controller.get_all_states()
+        if not any(info["state"] for info in all_states.values()):
+            logger.info("[TIMELAPSE] Dark detected. Pulsing Main White for 2s...")
+            self.led_controller.led_control("main", GPIO_PINS["main_led"], True)
+            time.sleep(2) # Wait for camera exposure
+            restore_main = True
+        
+        metadata = {"temp": temp, "hum": hum, "harvest": harvest}
+        success = self.camera_controller.capture_timelapse_frame(metadata=metadata)
+        
+        if restore_main:
+            self.led_controller.led_control("main", GPIO_PINS["main_led"], False)
+            
+        return success
 
     def rebuild_scheduler(self):
         """Standardized method to initialize or refresh all background scheduled tasks."""
@@ -138,7 +152,8 @@ class ApplicationSystem:
         
         # Initial log on startup
         threading.Timer(5, lambda: self.db_manager.save_measurement("heartbeat", 1)).start()
-        threading.Timer(12, self.log_sensors).start()
+        # Immediate logging to populate charts faster
+        self.log_sensors()
         
         # New: Continuous cache update every 30 seconds
         def update_cache_loop():
@@ -160,11 +175,12 @@ class ApplicationSystem:
         
         while True:
             try:
-                with self.lock:
-                    schedule.run_pending()
+                # IMPORTANT: Run pending WITHOUT the global lock to avoid deadlock
+                # inside scheduled jobs like log_sensors() which try to acquire self.lock
+                schedule.run_pending()
             except Exception as e:
                 logger.error(f"Error in daemon loop: {e}")
-            time.sleep(30)
+            time.sleep(10) # 10s resolution is enough for 15+ min tasks
 
 system = ApplicationSystem()
 init_routes(system)

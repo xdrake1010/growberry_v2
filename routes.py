@@ -88,7 +88,7 @@ def control_irrigation(action):
 
 @api.route('/timelapse/capture', methods=['POST'])
 def manual_timelapse_capture():
-    success = _system.camera_controller.capture_timelapse_frame()
+    success = _system.scheduled_timelapse()
     if success:
         return jsonify({"status": "success", "message": "Captured and saved."})
     return jsonify({"status": "error", "message": "Failed to capture frame."}), 500
