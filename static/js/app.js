@@ -414,12 +414,12 @@ const app = {
             card.className = 'folder-card glass-panel sm';
             card.onclick = () => { this.galleryState.cosecha = cosecha.name; this.renderGallery(); };
             card.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <i class="fa-solid fa-folder-closed"></i>
+                <div class="card-top-actions">
                     <button class="btn-icon danger" onclick="event.stopPropagation(); app.deleteHarvest('${cosecha.name}')">
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
                 </div>
+                <i class="fa-solid fa-folder-closed"></i>
                 <strong>${cosecha.name}</strong>
                 <span>${cosecha.dates.length} Days tracked</span>
             `;
@@ -440,9 +440,9 @@ const app = {
             card.innerHTML = `
                 <img src="${firstImg}" class="preview-img" loading="lazy">
                 <div class="folder-overlay">
-                    <div style="position:absolute; top:10px; right:10px;">
+                    <div class="card-top-actions">
                         <button class="btn-icon danger" onclick="event.stopPropagation(); app.deleteFolder('${this.galleryState.cosecha}', '${entry.date}')">
-                            <i class="fa-solid fa-trash-can" style="font-size:1.2em;"></i>
+                            <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
                     <i class="fa-solid fa-calendar-day" style="font-size: 32px;"></i>
@@ -644,8 +644,8 @@ const app = {
                         <span>${video.date} • ${video.size}</span>
                     </div>
                     <div class="video-actions">
-                        <a href="/api/timelapse/download/${video.name}" class="btn primary sm"><i class="fa-solid fa-download"></i></a>
-                        <button class="btn danger-sm" onclick="app.deleteVideo('${video.name}')"><i class="fa-solid fa-trash-can"></i></button>
+                        <a href="/api/timelapse/download/${video.name}" class="btn-icon primary"><i class="fa-solid fa-download"></i></a>
+                        <button class="btn-icon danger" onclick="app.deleteVideo('${video.name}')"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
                 `;
                 list.appendChild(el);

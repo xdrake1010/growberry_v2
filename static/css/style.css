@@ -626,14 +626,85 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 12px 15px !important;
+    gap: 12px;
 }
 .video-info {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
-.video-info strong { font-size: 0.85em; }
-.video-info span { font-size: 0.7em; opacity: 0.6; }
+.video-info strong { 
+    font-size: 0.85em; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+}
+.video-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Delete Button Styles */
+.btn-icon { 
+    background: none; 
+    border: none; 
+    cursor: pointer; 
+    opacity: 0.6; 
+    transition: all 0.2s; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 6px;
+    color: var(--text-muted);
+}
+.btn-icon:hover { 
+    opacity: 1; 
+    background: rgba(255,255,255,0.05);
+}
+.btn-icon.danger:hover { 
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.image-card .btn-delete {
+    position: absolute; 
+    top: 8px; 
+    right: 8px; 
+    opacity: 0;
+    background: rgba(0, 0, 0, 0.4); 
+    color: #fff; 
+    border: none;
+    width: 32px; 
+    height: 32px; 
+    border-radius: 8px; 
+    cursor: pointer;
+    transition: all 0.2s; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    z-index: 20;
+    backdrop-filter: blur(4px);
+}
+.image-card:hover .btn-delete { 
+    opacity: 1; 
+}
+.image-card .btn-delete:hover {
+    background: var(--danger);
+    transform: scale(1.1);
+}
+
+.card-top-actions {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    gap: 8px;
+}
 
 /* Gallery Navigation & Config */
 .gallery-config-bar {
