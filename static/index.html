@@ -165,19 +165,15 @@
                         <h2>Live Feed</h2>
                         <div class="feed-wrapper">
                             <img id="live-video" src="/api/video_feed" alt="Camera Live Feed" onerror="this.onerror=null; this.src='/placeholder-camera.jpg'; this.alt='Feed Unavailable';"/>
-                            <div class="feed-overlay">
-                                <div class="overlay-top">
-                                    <span id="ov-cosecha">--</span>
-                                </div>
-                                <div class="overlay-bottom">
-                                    <span id="ov-temp"><i class="fa-solid fa-temperature-half"></i> --°C</span>
-                                    <span id="ov-hum"><i class="fa-solid fa-droplet"></i> --%</span>
-                                </div>
-                            </div>
                         </div>
                         <div class="camera-actions">
                             <button class="btn primary" onclick="app.captureFrame()"><i class="fa-solid fa-camera"></i> Manual Capture</button>
                             <button class="btn secondary" onclick="app.reloadFeed()"><i class="fa-solid fa-rotate"></i> Reload Stream</button>
+                        </div>
+                        <div class="camera-status-row">
+                            <span class="status-item"><i class="fa-solid fa-seedling"></i> <span id="ov-cosecha">--</span></span>
+                            <span id="ov-temp" class="status-item tooltip"><i class="fa-solid fa-temperature-half"></i> --°C</span>
+                            <span id="ov-hum" class="status-item tooltip"><i class="fa-solid fa-droplet"></i> --%</span>
                         </div>
                     </div>
                 </section>
