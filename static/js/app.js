@@ -220,9 +220,24 @@ const app = {
             
             this.activeCosecha = data.active_cosecha || data.cycle_info?.cosecha_name;
 
+            // Dashboard & Overlay Harvest Name
+            const dashNameEl = document.getElementById('dash-cosecha-name');
+            if (dashNameEl) dashNameEl.textContent = this.activeCosecha || 'No Active Harvest';
+            
+            const ovNameEl = document.getElementById('ov-cosecha');
+            if (ovNameEl) ovNameEl.textContent = this.activeCosecha || 'None';
+
             // Basic Environment
-            document.getElementById('val-temp').textContent = data.temperature ? `${data.temperature}°C` : '--°C';
-            document.getElementById('val-hum').textContent = data.humidity ? `${data.humidity}%` : '--%';
+            const tempStr = data.temperature ? `${data.temperature}°C` : '--°C';
+            const humStr = data.humidity ? `${data.humidity}%` : '--%';
+            
+            document.getElementById('val-temp').textContent = tempStr;
+            document.getElementById('val-hum').textContent = humStr;
+            
+            const ovTempEl = document.getElementById('ov-temp');
+            const ovHumEl = document.getElementById('ov-hum');
+            if (ovTempEl) ovTempEl.innerHTML = `<i class="fa-solid fa-temperature-half"></i> ${tempStr}`;
+            if (ovHumEl) ovHumEl.innerHTML = `<i class="fa-solid fa-droplet"></i> ${humStr}`;
             
             // Hardware Status
             this.updateBadge('st-main-led', data.leds?.main?.state);
@@ -231,6 +246,9 @@ const app = {
             this.updateBadge('st-vent', data.ventilation);
             this.updateBadge('st-tank', data.tank);
             this.updateBadge('st-irr', data.irrigation);
+
+            // Manual Controls Synchronization
+            this.syncManualControls(data);
 
             // Cycle Data
             const cycleEl = document.getElementById('val-cycle');
@@ -300,12 +318,39 @@ const app = {
 
     updateBadge(id, state) {
         const el = document.getElementById(id);
+        if(!el) return;
         if(state) {
             el.textContent = 'ON';
             el.className = 'badge on';
         } else {
             el.textContent = 'OFF';
             el.className = 'badge off';
+        }
+    },
+
+    syncManualControls(data) {
+        const states = {
+            'led-main': data.leds?.main?.state,
+            'led-infrared': data.leds?.infrared?.state,
+            'led-ultrablue': data.leds?.ultrablue?.state,
+            'vent': data.ventilation,
+            'tank': data.tank,
+            'irrigation': data.irrigation
+        };
+
+        for (const [key, isOn] of Object.entries(states)) {
+            const btnOn = document.getElementById(`ctrl-${key}-on`);
+            const btnOff = document.getElementById(`ctrl-${key}-off`);
+            
+            if (btnOn && btnOff) {
+                if (isOn) {
+                    btnOn.classList.add('active');
+                    btnOff.classList.remove('active');
+                } else {
+                    btnOn.classList.remove('active');
+                    btnOff.classList.add('active');
+                }
+            }
         }
     },
 
@@ -725,6 +770,12 @@ const app = {
                     opt.textContent = name;
                     this.harvestSelector.appendChild(opt);
                 });
+                
+                // NEW: Auto-load the active harvest if present
+                if (this.activeCosecha) {
+                    this.harvestSelector.value = this.activeCosecha;
+                    this.loadSelectedHarvest();
+                }
             }
         } catch(e) { this.showToast(e.message, true); }
     },

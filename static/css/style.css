@@ -940,3 +940,93 @@ body {
     width: 1px;
     background: rgba(255,255,255,0.2);
 }
+
+/* --- New UI Enhancements --- */
+
+.dashboard-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 0 4px;
+}
+
+#dash-cosecha-name {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+}
+
+.feed-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 16px;
+    background: linear-gradient(rgba(0,0,0,0.5) 0%, transparent 15%, transparent 85%, rgba(0,0,0,0.5) 100%);
+    z-index: 5;
+}
+
+.overlay-top span {
+    background: rgba(16, 185, 129, 0.2);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 6px 14px;
+    border-radius: 30px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.overlay-bottom {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.overlay-bottom span {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+}
+
+/* Manual Overrides Active States */
+.toggle-btns .btn.active.on {
+    background: var(--accent-primary) !important;
+    color: #000 !important;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.toggle-btns .btn.active.off {
+    background: var(--danger) !important;
+    color: #fff !important;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Fix for white dropdown on some browsers/platforms */
+select option {
+    background-color: #1a1f2e; /* Deep navy/charcoal */
+    color: var(--text-main);
+    padding: 10px;
+}
+
+select:focus {
+    background-color: #1a1f2e;
+}

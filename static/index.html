@@ -45,6 +45,10 @@
             <div class="view-container">
                 <!-- Dashboard Tab -->
                 <section id="dashboard" class="tab-content active">
+                    <div class="dashboard-header-row">
+                        <h2 id="dash-cosecha-name">Loading Harvest...</h2>
+                        <span id="dash-cosecha-status" class="badge">Active</span>
+                    </div>
                     <div class="widget-grid">
                         <div class="widget glass-panel">
                             <div class="widget-icon temp"><i class="fa-solid fa-temperature-half"></i></div>
@@ -161,6 +165,15 @@
                         <h2>Live Feed</h2>
                         <div class="feed-wrapper">
                             <img id="live-video" src="/api/video_feed" alt="Camera Live Feed" onerror="this.onerror=null; this.src='/placeholder-camera.jpg'; this.alt='Feed Unavailable';"/>
+                            <div class="feed-overlay">
+                                <div class="overlay-top">
+                                    <span id="ov-cosecha">--</span>
+                                </div>
+                                <div class="overlay-bottom">
+                                    <span id="ov-temp"><i class="fa-solid fa-temperature-half"></i> --°C</span>
+                                    <span id="ov-hum"><i class="fa-solid fa-droplet"></i> --%</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="camera-actions">
                             <button class="btn primary" onclick="app.captureFrame()"><i class="fa-solid fa-camera"></i> Manual Capture</button>
@@ -176,43 +189,43 @@
                         <div class="control-group">
                             <label>Main White</label>
                             <div class="toggle-btns">
-                                <button class="btn on" onclick="app.toggleAction('led', 'main', 'on')">ON</button>
-                                <button class="btn off" onclick="app.toggleAction('led', 'main', 'off')">OFF</button>
+                                <button id="ctrl-led-main-on" class="btn on" onclick="app.toggleAction('led', 'main', 'on')">ON</button>
+                                <button id="ctrl-led-main-off" class="btn off" onclick="app.toggleAction('led', 'main', 'off')">OFF</button>
                             </div>
                         </div>
                         <div class="control-group">
                             <label>Ultra Red</label>
                             <div class="toggle-btns">
-                                <button class="btn on" onclick="app.toggleAction('led', 'infrared', 'on')">ON</button>
-                                <button class="btn off" onclick="app.toggleAction('led', 'infrared', 'off')">OFF</button>
+                                <button id="ctrl-led-infrared-on" class="btn on" onclick="app.toggleAction('led', 'infrared', 'on')">ON</button>
+                                <button id="ctrl-led-infrared-off" class="btn off" onclick="app.toggleAction('led', 'infrared', 'off')">OFF</button>
                             </div>
                         </div>
                         <div class="control-group">
                             <label>Infra Blue</label>
                             <div class="toggle-btns">
-                                <button class="btn on" onclick="app.toggleAction('led', 'ultrablue', 'on')">ON</button>
-                                <button class="btn off" onclick="app.toggleAction('led', 'ultrablue', 'off')">OFF</button>
+                                <button id="ctrl-led-ultrablue-on" class="btn on" onclick="app.toggleAction('led', 'ultrablue', 'on')">ON</button>
+                                <button id="ctrl-led-ultrablue-off" class="btn off" onclick="app.toggleAction('led', 'ultrablue', 'off')">OFF</button>
                             </div>
                         </div>
                         <div class="control-group">
                             <label>Ventilation</label>
                             <div class="toggle-btns">
-                                <button class="btn on" onclick="app.toggleAction('ventilation', null, 'on')">ON</button>
-                                <button class="btn off" onclick="app.toggleAction('ventilation', null, 'off')">OFF</button>
+                                <button id="ctrl-vent-on" class="btn on" onclick="app.toggleAction('ventilation', null, 'on')">ON</button>
+                                <button id="ctrl-vent-off" class="btn off" onclick="app.toggleAction('ventilation', null, 'off')">OFF</button>
                             </div>
                         </div>
                         <div class="control-group">
                             <label>Tank Filling</label>
                             <div class="toggle-btns">
-                                <button class="btn on" onclick="app.toggleAction('tank', null, 'on')">ON</button>
-                                <button class="btn off" onclick="app.toggleAction('tank', null, 'off')">OFF</button>
+                                <button id="ctrl-tank-on" class="btn on" onclick="app.toggleAction('tank', null, 'on')">ON</button>
+                                <button id="ctrl-tank-off" class="btn off" onclick="app.toggleAction('tank', null, 'off')">OFF</button>
                             </div>
                         </div>
                         <div class="control-group">
                             <label>Irrigate Now</label>
                             <div class="toggle-btns">
-                                <button class="btn on" onclick="app.toggleAction('irrigation', null, 'on')">ON</button>
-                                <button class="btn off" onclick="app.toggleAction('irrigation', null, 'off')">OFF</button>
+                                <button id="ctrl-irrigation-on" class="btn on" onclick="app.toggleAction('irrigation', null, 'on')">ON</button>
+                                <button id="ctrl-irrigation-off" class="btn off" onclick="app.toggleAction('irrigation', null, 'off')">OFF</button>
                             </div>
                         </div>
                     </div>
