@@ -634,39 +634,6 @@ const app = {
             }
         } catch(e) { this.showToast(e.message, true); }
     },
-                const opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = name;
-                if(name === data.active_cosecha) opt.selected = true;
-                this.harvestSelector.appendChild(opt);
-            });
-            
-            const interval = data.timelapse_interval_minutes || 60;
-            const enabled = data.timelapse_enabled !== false;
-
-            if (document.getElementById('cfg-timelapse-interval')) {
-                document.getElementById('cfg-timelapse-interval').value = interval;
-            }
-            if (document.getElementById('cfg-timelapse-enabled')) {
-                document.getElementById('cfg-timelapse-enabled').checked = enabled;
-            }
-            
-            // Sync Gallery Toolbar
-            if (document.getElementById('glr-timelapse-interval')) {
-                document.getElementById('glr-timelapse-interval').value = interval;
-            }
-            if (document.getElementById('glr-timelapse-enabled')) {
-                document.getElementById('glr-timelapse-enabled').checked = enabled;
-            }
-            
-            if (document.getElementById('cfg-log-interval')) {
-                document.getElementById('cfg-log-interval').value = data.sensor_log_interval_minutes || 1;
-            }
-            
-            this.renderHarvestData(data.active_cosecha || 'default');
-
-        } catch(e) { console.error("Failed loading config into form", e); }
-    },
 
     loadSelectedHarvest() {
         const name = this.harvestSelector.value;
