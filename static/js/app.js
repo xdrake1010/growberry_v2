@@ -10,6 +10,7 @@ const app = {
         try {
             this.galleryState = { cosecha: null, date: null, rawData: [] };
             this.fetchStats();
+            this.loadConfigToForm(); // Pre-load config for quick settings access
             
             // Refresh stats and charts every 30 seconds
             setInterval(async () => {
@@ -213,7 +214,7 @@ const app = {
     async fetchStats() {
         try {
             const res = await fetch('/api/statistics');
-            if(!res.ok) throw new Error('Failed to fetch');
+            if(!res.ok) throw new Error(`Server Error (${res.status})`);
             const data = await res.json();
             
             this.activeCosecha = data.active_cosecha || data.cycle_info?.cosecha_name;
@@ -364,7 +365,7 @@ const app = {
         try {
             if (forceSync || this.galleryState.rawData.length === 0) {
                 const res = await fetch('/api/timelapse/index');
-                if(!res.ok) throw new Error('Failed to fetch gallery index');
+                if(!res.ok) throw new Error(`Gallery Sync Error (${res.status})`);
                 this.galleryState.rawData = await res.json();
             }
             
@@ -483,6 +484,11 @@ const app = {
         const interval = parseInt(document.getElementById('glr-timelapse-interval').value) || 60;
         
         try {
+            // Ensure fullConfig is loaded before trying to clone it
+            if (!this.fullConfig) {
+                await this.loadConfigToForm();
+            }
+            
             const newConfig = JSON.parse(JSON.stringify(this.fullConfig));
             newConfig.timelapse_enabled = enabled;
             newConfig.timelapse_interval_minutes = interval;
@@ -492,6 +498,9 @@ const app = {
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(newConfig)
             });
+            
+            if (!res.ok) throw new Error(`Save Failed (${res.status})`);
+            
             const data = await res.json();
             if (data.status === 'success') {
                 this.showToast("Timelapse settings updated");
@@ -570,6 +579,7 @@ const app = {
     async fetchCameraStatus() {
         try {
             const res = await fetch('/api/camera/status');
+            if (!res.ok) return; // Silent fail for status polling
             const data = await res.json();
             
             const dot = document.getElementById('cam-indicator');
@@ -592,6 +602,7 @@ const app = {
     async loadConfigToForm() {
         try {
             const res = await fetch('/api/configs');
+            if (!res.ok) throw new Error(`Config Load Error (${res.status})`);
             const data = await res.json();
             this.fullConfig = data; // Cache full config for saving
             

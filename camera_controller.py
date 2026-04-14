@@ -76,7 +76,8 @@ class CameraController:
                         cap = cv2.VideoCapture(idx, backend)
                         if cap.isOpened():
                             # CRITICAL: Give camera a moment to initialize hardware buffers
-                            time.sleep(0.8) # Slightly reduced for faster fail-over
+                            # On Pi Zero, anything less than 1.5s can cause 'Protocol Error' with Redragon
+                            time.sleep(1.5) 
                             
                             # LIMP MODE: Force 320x240 to save USB bandwidth on Pi Zero
                             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
@@ -85,7 +86,7 @@ class CameraController:
                             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                             
                             # Warm-up: Read and discard first few frames to stabilize exposure/balance
-                            for _ in range(3): # Reduced from 5
+                            for _ in range(5): # Back to 5 for better stability
                                 cap.grab() 
                             
                             # Test if we can actually read a valid frame
@@ -115,7 +116,7 @@ class CameraController:
             
             # USB Recovery Sleep: Only if we haven't given up yet
             if attempt < max_attempts - 1:
-                time.sleep(1.0)
+                time.sleep(2.0)
         
         # Mark failure time to trigger cooldown
         self.last_fail_time = time.time()
