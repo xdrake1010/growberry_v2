@@ -484,12 +484,12 @@ const app = {
         const interval = parseInt(document.getElementById('glr-timelapse-interval').value) || 60;
         
         try {
-            // Ensure fullConfig is loaded before trying to clone it
+            // Ensure fullConfig is loaded using new safe magic
             if (!this.fullConfig) {
-                await this.loadConfigToForm();
+                await this.fetchFullConfig();
             }
             
-            const newConfig = JSON.parse(JSON.stringify(this.fullConfig));
+            const newConfig = JSON.parse(JSON.stringify(this.fullConfig || {}));
             newConfig.timelapse_enabled = enabled;
             newConfig.timelapse_interval_minutes = interval;
             
@@ -599,20 +599,41 @@ const app = {
         } catch(e) { console.error("Failed to fetch camera status", e); }
     },
 
-    async loadConfigToForm() {
+    async fetchFullConfig() {
         try {
             const res = await fetch('/api/configs');
             if (!res.ok) throw new Error(`Config Load Error (${res.status})`);
             const data = await res.json();
-            this.fullConfig = data; // Cache full config for saving
-            
-            // Advanced raw editor update
-            this.configEditor.value = JSON.stringify(data, null, 4);
+            this.fullConfig = data;
+            return data;
+        } catch(e) {
+            console.error("fetchFullConfig failed", e);
+            throw e;
+        }
+    },
 
-            // Populate Selector
-            this.harvestSelector.innerHTML = '<option value="">-- Create New / Select --</option>';
-            const plants = data.plants || {};
-            Object.keys(plants).forEach(name => {
+    async loadConfigToForm() {
+        try {
+            const data = await this.fetchFullConfig();
+            
+            // Advanced raw editor update - Only if element exists in cave
+            if (this.configEditor) {
+                this.configEditor.value = JSON.stringify(data, null, 4);
+            }
+
+            // Populate Selector - Only if element exists in cave
+            if (this.harvestSelector) {
+                this.harvestSelector.innerHTML = '<option value="">-- Create New / Select --</option>';
+                const plants = data.plants || {};
+                Object.keys(plants).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    this.harvestSelector.appendChild(opt);
+                });
+            }
+        } catch(e) { this.showToast(e.message, true); }
+    },
                 const opt = document.createElement('option');
                 opt.value = name;
                 opt.textContent = name;
