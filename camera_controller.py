@@ -63,26 +63,35 @@ class CameraController:
                         cap = cv2.VideoCapture(idx, backend)
                         if cap.isOpened():
                             # CRITICAL: Give camera a moment to initialize hardware buffers
-                            time.sleep(1.0)
+                            time.sleep(1.2) # Increased for stability
                             
-                            # Set format to MJPEG
+                            # LIMP MODE: Force 320x240 to save USB bandwidth on Pi Zero
                             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-                            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+                            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
                             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                             
                             # Warm-up: Read and discard first few frames to stabilize exposure/balance
                             for _ in range(5):
-                                cap.grab() # grab is faster than read() if we don't need the frame
+                                cap.grab() 
                             
                             # Test if we can actually read a valid frame
                             success, frame = cap.read()
                             if success and frame is not None:
-                                logger.info(f"[SUCCESS] Camera {idx} is UP and providing frames.")
+                                logger.info(f"[SUCCESS] Camera {idx} is UP at 320x240.")
                                 self.camera_index = idx 
                                 self.shared_camera = cap
                                 return cap
                             else:
+                                # Falling back to raw format if MJPEG failed
+                                logger.warning(f"[RETRY] MJPEG failed on index {idx}, trying YUYV...")
+                                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
+                                success, frame = cap.read()
+                                if success:
+                                    logger.info(f"[SUCCESS] Camera {idx} is UP (YUYV fallback).")
+                                    self.shared_camera = cap
+                                    return cap
+                                
                                 logger.warning(f"[FAIL] Camera {idx} opened but failed to read frame.")
                                 cap.release()
                         else:
@@ -90,8 +99,10 @@ class CameraController:
                     except Exception as e:
                         logger.warning(f"Error opening camera {idx}: {e}")
             
+            # USB Recovery Sleep: Wait for the hub to stabilize before retry
             if attempt < max_attempts - 1:
-                time.sleep(1.0)
+                logger.info("[RECOVERY] Sleeping 2.0s to allow USB hub reset...")
+                time.sleep(2.0)
                 
         return None
 

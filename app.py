@@ -116,12 +116,22 @@ class ApplicationSystem:
             harvest = self.active_cosecha
         
         metadata = {"temp": temp, "hum": hum, "harvest": harvest}
-        success = self.camera_controller.capture_timelapse_frame(metadata=metadata)
         
-        if success:
-            logger.info(f"[TIMELAPSE] {'Manual' if is_manual else 'Automatic'} capture SUCCESSFUL.")
-        else:
-            logger.error(f"[TIMELAPSE] {'Manual' if is_manual else 'Automatic'} capture FAILED.")
+        # Implement retries for hardware resilience
+        success = False
+        max_retries = 3
+        for i in range(max_retries):
+            success = self.camera_controller.capture_timelapse_frame(metadata=metadata)
+            if success:
+                logger.info(f"[TIMELAPSE] {'Manual' if is_manual else 'Automatic'} capture SUCCESSFUL on attempt {i+1}.")
+                break
+            
+            if i < max_retries - 1:
+                logger.warning(f"[TIMELAPSE] Capture failed. Retrying in 5s... ({i+1}/{max_retries})")
+                time.sleep(5)
+
+        if not success:
+            logger.error(f"[TIMELAPSE] {'Manual' if is_manual else 'Automatic'} capture PERMANENTLY FAILED after {max_retries} attempts.")
             
         if restore_main:
             self.led_controller.led_control("main", GPIO_PINS["main_led"], False)
