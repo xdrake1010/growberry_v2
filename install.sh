@@ -37,6 +37,15 @@ sudo systemctl enable "$SERVICE_FILE"
 sudo systemctl restart "$SERVICE_FILE"
 
 echo "------------------------------------------------"
+echo "Installing WiFi Watchdog..."
+sudo cp wifi_watchdog.sh /usr/local/sbin/growberry_wifi_watchdog.sh
+sudo chmod +x /usr/local/sbin/growberry_wifi_watchdog.sh
+sudo cp growberry-wifi-watchdog.service /etc/systemd/system/
+sudo cp growberry-wifi-watchdog.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now growberry-wifi-watchdog.timer
+
+echo "------------------------------------------------"
 echo "Installation complete!"
 echo "Check status with: sudo systemctl status $SERVICE_FILE"
 echo "See logs with: journalctl -u $SERVICE_FILE -f"

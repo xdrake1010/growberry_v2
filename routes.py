@@ -1,3 +1,4 @@
+import shutil
 import os
 from flask import Blueprint, jsonify, request, Response, send_from_directory
 from Adafruit_DHT import DHT11, read_retry
@@ -154,6 +155,68 @@ def view_timelapse_image(filename):
     """Serves an image from the TIMELAPSE_BASE_DIR"""
     return send_from_directory(TIMELAPSE_BASE_DIR, filename)
 
+@api.route('/timelapse/delete/image/<cosecha>/<date>/<filename>', methods=['DELETE'])
+def delete_timelapse_image(cosecha, date, filename):
+    """Deletes a specific image file."""
+    try:
+        rel_path = f"{cosecha}/{date}/{filename}"
+        target_path = os.path.abspath(os.path.join(TIMELAPSE_BASE_DIR, rel_path))
+        
+        if not target_path.startswith(os.path.abspath(TIMELAPSE_BASE_DIR)):
+            return jsonify({"status": "error", "message": "Unauthorized path"}), 403
+            
+        if os.path.exists(target_path):
+            os.remove(target_path)
+            # Check if parent directory is empty and delete it if it is
+            date_dir = os.path.dirname(target_path)
+            if not os.listdir(date_dir):
+                os.rmdir(date_dir)
+            return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "File not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api.route('/timelapse/delete/folder/<cosecha>/<date>', methods=['DELETE'])
+def delete_timelapse_folder(cosecha, date):
+    """Deletes a complete date folder."""
+    try:
+        rel_path = f"{cosecha}/{date}"
+        target_path = os.path.abspath(os.path.join(TIMELAPSE_BASE_DIR, rel_path))
+        
+        if not target_path.startswith(os.path.abspath(TIMELAPSE_BASE_DIR)):
+            return jsonify({"status": "error", "message": "Unauthorized path"}), 403
+            
+        if os.path.exists(target_path) and os.path.isdir(target_path):
+            shutil.rmtree(target_path)
+            return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "Folder not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api.route('/timelapse/delete/cosecha/<cosecha>', methods=['DELETE'])
+def delete_cosecha(cosecha):
+    """Deletes an entire harvest catalog."""
+    try:
+        target_path = os.path.abspath(os.path.join(TIMELAPSE_BASE_DIR, cosecha))
+        
+        if not target_path.startswith(os.path.abspath(TIMELAPSE_BASE_DIR)):
+            return jsonify({"status": "error", "message": "Unauthorized path"}), 403
+            
+        if os.path.exists(target_path) and os.path.isdir(target_path):
+            shutil.rmtree(target_path)
+            return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "Cosecha not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@api.route('/timelapse/delete/video/<filename>', methods=['DELETE'])
+def delete_video(filename):
+    """Deletes an exported video file."""
+    success, message = _system.video_generator.delete_video(filename)
+    if success:
+        return jsonify({"status": "success"})
+    return jsonify({"status": "error", "message": message}), 400
+
 @api.route('/configs', methods=['GET'])
 def get_configs():
     return jsonify(load_plants_config())
@@ -185,7 +248,10 @@ def get_history():
 def export_timelapse():
     cosecha = request.json.get('cosecha', _system.active_cosecha)
     fps = request.json.get('fps', 10)
-    success, message = _system.video_generator.export_cosecha(cosecha, fps)
+    date_from = request.json.get('date_from')
+    date_to = request.json.get('date_to')
+    
+    success, message = _system.video_generator.export_cosecha(cosecha, fps, date_from, date_to)
     if success:
         return jsonify({"status": "success", "message": message})
     return jsonify({"status": "error", "message": message}), 400

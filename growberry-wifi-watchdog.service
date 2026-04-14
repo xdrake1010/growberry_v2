@@ -1,0 +1,10 @@
+[Unit]
+Description=Growberry WiFi Watchdog Service
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/growberry_wifi_watchdog.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -85,6 +85,7 @@ const app = {
                 if(target === 'timelapse') {
                     this.loadGallery();
                     this.fetchCameraStatus();
+                    this.loadTimelapseQuickSettings();
                 }
             });
         });
@@ -413,7 +414,12 @@ const app = {
             card.className = 'folder-card glass-panel sm';
             card.onclick = () => { this.galleryState.cosecha = cosecha.name; this.renderGallery(); };
             card.innerHTML = `
-                <i class="fa-solid fa-folder-closed"></i>
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                    <i class="fa-solid fa-folder-closed"></i>
+                    <button class="btn-icon danger" onclick="event.stopPropagation(); app.deleteHarvest('${cosecha.name}')">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
                 <strong>${cosecha.name}</strong>
                 <span>${cosecha.dates.length} Days tracked</span>
             `;
@@ -434,6 +440,11 @@ const app = {
             card.innerHTML = `
                 <img src="${firstImg}" class="preview-img" loading="lazy">
                 <div class="folder-overlay">
+                    <div style="position:absolute; top:10px; right:10px;">
+                        <button class="btn-icon danger" onclick="event.stopPropagation(); app.deleteFolder('${this.galleryState.cosecha}', '${entry.date}')">
+                            <i class="fa-solid fa-trash-can" style="font-size:1.2em;"></i>
+                        </button>
+                    </div>
                     <i class="fa-solid fa-calendar-day" style="font-size: 32px;"></i>
                     <strong>${entry.date}</strong>
                     <span>${entry.images.length} Captures</span>
@@ -453,6 +464,9 @@ const app = {
             card.onclick = () => this.openLightbox(img.url, `${cosecha.name} - ${dateEntry.date} ${img.timestamp}`);
             card.innerHTML = `
                 <img src="${img.url}" alt="${img.name}" loading="lazy">
+                <button class="btn-delete" onclick="event.stopPropagation(); app.deleteImage('${this.galleryState.cosecha}', '${this.galleryState.date}', '${img.name}')">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
                 <div class="img-info">${img.timestamp.match(/.{1,2}/g).join(':')}</div>
             `;
             grid.appendChild(card);
@@ -471,6 +485,13 @@ const app = {
         if (date) {
             container.innerHTML += `<span class="breadcrumb-sep">/</span><span class="breadcrumb-item active">${date}</span>`;
         }
+    },
+
+    async loadTimelapseQuickSettings() {
+        if (!this.fullConfig) await this.fetchFullConfig();
+        const cfg = this.fullConfig || {};
+        document.getElementById('glr-timelapse-enabled').checked = cfg.timelapse_enabled === true;
+        document.getElementById('glr-timelapse-interval').value = cfg.timelapse_interval_minutes || 60;
     },
 
     resetGallery() {
@@ -509,24 +530,94 @@ const app = {
         } catch(e) { this.showToast(e.message, true); }
     },
 
-    async exportTimelapse() {
-        this.showToast("Starting video generation. This may take several minutes...", false);
+    openExportModal() {
+        if(!this.fullConfig) this.fetchFullConfig();
+        const sel = document.getElementById('exp-cosecha-selector');
+        sel.innerHTML = '';
+        if(this.fullConfig?.plants) {
+            Object.keys(this.fullConfig.plants).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name; opt.textContent = name;
+                if(name === this.activeCosecha) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+        document.getElementById('export-modal').classList.remove('hidden');
+    },
+
+    closeExportModal() {
+        document.getElementById('export-modal').classList.add('hidden');
+    },
+
+    async runExport() {
+        const cosecha = document.getElementById('exp-cosecha-selector').value;
+        const from = document.getElementById('exp-date-from').value;
+        const to = document.getElementById('exp-date-to').value;
+        const fps = document.getElementById('exp-fps').value;
+        
+        this.closeExportModal();
+        this.showToast("Starting video generation...");
+        
         try {
             const res = await fetch('/api/timelapse/export', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ cosecha: this.activeCosecha, fps: 10 })
+                body: JSON.stringify({ cosecha, fps, date_from: from, date_to: to })
             });
             const data = await res.json();
             if(data.status === 'success') {
                 this.showToast(data.message);
-                setTimeout(() => this.loadExports(), 5000); // Check after 5s
-            } else {
-                throw new Error(data.message);
+                setTimeout(() => this.loadExports(), 5000);
+            } else throw new Error(data.message);
+        } catch(e) { this.showToast(e.message, true); }
+    },
+
+    async deleteImage(cosecha, date, filename) {
+        if(!confirm("Delete this image?")) return;
+        try {
+            const res = await fetch(`/api/timelapse/delete/image/${cosecha}/${date}/${filename}`, { method: 'DELETE' });
+            if(res.ok) {
+                this.showToast("Image deleted");
+                await this.loadGallery(true);
             }
-        } catch(e) {
-            this.showToast(e.message, true);
-        }
+        } catch(e) { this.showToast("Delete failed", true); }
+    },
+
+    async deleteFolder(cosecha, date) {
+        if(!confirm(`Delete EVERYTHING from ${date}?`)) return;
+        try {
+            const res = await fetch(`/api/timelapse/delete/folder/${cosecha}/${date}`, { method: 'DELETE' });
+            if(res.ok) {
+                this.showToast("Day deleted");
+                await this.loadGallery(true);
+            }
+        } catch(e) { this.showToast("Delete failed", true); }
+    },
+
+    async deleteHarvest(cosecha) {
+        if(!confirm(`PERMANENTLY DELETE all images for ${cosecha}?`)) return;
+        try {
+            const res = await fetch(`/api/timelapse/delete/cosecha/${cosecha}`, { method: 'DELETE' });
+            if(res.ok) {
+                this.showToast("Harvest deleted");
+                await this.loadGallery(true);
+            }
+        } catch(e) { this.showToast("Delete failed", true); }
+    },
+
+    async deleteVideo(filename) {
+        if(!confirm("Delete this video?")) return;
+        try {
+            const res = await fetch(`/api/timelapse/delete/video/${filename}`, { method: 'DELETE' });
+            if(res.ok) {
+                this.showToast("Video deleted");
+                this.loadExports();
+            }
+        } catch(e) { this.showToast("Delete failed", true); }
+    },
+
+    async exportTimelapse() {
+        this.openExportModal();
     },
 
     async loadExports() {
@@ -552,7 +643,10 @@ const app = {
                         <strong>${video.name}</strong>
                         <span>${video.date} • ${video.size}</span>
                     </div>
-                    <a href="/api/timelapse/download/${video.name}" class="btn primary sm"><i class="fa-solid fa-download"></i></a>
+                    <div class="video-actions">
+                        <a href="/api/timelapse/download/${video.name}" class="btn primary sm"><i class="fa-solid fa-download"></i></a>
+                        <button class="btn danger-sm" onclick="app.deleteVideo('${video.name}')"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
                 `;
                 list.appendChild(el);
             });

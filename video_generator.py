@@ -16,16 +16,16 @@ class VideoGenerator:
         self.is_exporting = False
         self.current_job = None
 
-    def export_cosecha(self, cosecha_name, fps=10):
-        """Starts an asynchronous export job for a specific harvest."""
+    def export_cosecha(self, cosecha_name, fps=10, date_from=None, date_to=None):
+        """Starts an asynchronous export job for a specific harvest, optionally filtered by date."""
         if self.is_exporting:
             return False, "An export is already in progress."
         
-        thread = threading.Thread(target=self._run_export, args=(cosecha_name, fps))
+        thread = threading.Thread(target=self._run_export, args=(cosecha_name, fps, date_from, date_to))
         thread.start()
         return True, "Export started successfully."
 
-    def _run_export(self, cosecha_name, fps):
+    def _run_export(self, cosecha_name, fps, date_from, date_to):
         self.is_exporting = True
         self.current_job = cosecha_name
         
@@ -35,15 +35,26 @@ class VideoGenerator:
                 logger.error(f"Catalog for {cosecha_name} not found.")
                 return
 
-            # Collect all jpg images recursively
+            # Collect all images from folders that match the date range
             all_images = []
-            for root, dirs, files in os.walk(cosecha_path):
-                for file in sorted(files):
+            
+            # Get list of date folders and filter them
+            date_folders = sorted([d for d in os.listdir(cosecha_path) if os.path.isdir(os.path.join(cosecha_path, d))])
+            
+            for date_folder in date_folders:
+                # Basic string comparison for dates in YYYY-MM-DD format
+                if date_from and date_folder < date_from:
+                    continue
+                if date_to and date_folder > date_to:
+                    continue
+                    
+                date_path = os.path.join(cosecha_path, date_folder)
+                for file in sorted(os.listdir(date_path)):
                     if file.lower().endswith(('.jpg', '.jpeg')):
-                        all_images.append(os.path.join(root, file))
+                        all_images.append(os.path.join(date_path, file))
             
             if not all_images:
-                logger.error(f"No images found for {cosecha_name}")
+                logger.error(f"No images found for {cosecha_name} in the specified range.")
                 return
 
             # Create an ffmpeg manifest file
@@ -55,15 +66,11 @@ class VideoGenerator:
                     f.write(f"duration {1/fps}\n")
 
             # Final Output Path
-            output_filename = f"{cosecha_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.mp4"
+            range_suffix = f"_{date_from.replace('-','')}_to_{date_to.replace('-','')}" if date_from and date_to else ""
+            output_filename = f"{cosecha_name}{range_suffix}_{datetime.now().strftime('%Y%m%d_%H%M')}.mp4"
             output_path = os.path.join(EXPORTS_DIR, output_filename)
 
             # FFmpeg Command
-            # -f concat: use the manifest
-            # -safe 0: allow absolute paths
-            # -vcodec libx264: h264 encoding
-            # -pix_fmt yuv420p: compatibility for most players
-            # -y: overwrite
             cmd = [
                 'ffmpeg', '-y', '-f', 'concat', '-safe', '0', 
                 '-i', manifest_path, 
@@ -88,6 +95,22 @@ class VideoGenerator:
         finally:
             self.is_exporting = False
             self.current_job = None
+
+    def delete_video(self, filename):
+        """Deletes a generated video file."""
+        try:
+            # Security check: ensure the file is within EXPORTS_DIR
+            target_path = os.path.abspath(os.path.join(EXPORTS_DIR, filename))
+            if not target_path.startswith(os.path.abspath(EXPORTS_DIR)):
+                return False, "Unauthorized path"
+                
+            if os.path.exists(target_path):
+                os.remove(target_path)
+                return True, "Video deleted"
+            return False, "File not found"
+        except Exception as e:
+            logger.error(f"Delete video failed: {e}")
+            return False, str(e)
 
     def list_exports(self):
         """Lists all generated MP4 files in the exports directory."""
