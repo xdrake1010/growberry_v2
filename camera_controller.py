@@ -18,6 +18,7 @@ class CameraController:
         self.client_count = 0
         self.shared_camera = None
         self.last_frame = None
+        self.last_fail_time = 0 # Timestamp of last failed probe
 
     def set_cosecha_name(self, name):
         self.cosecha_name = name
@@ -29,8 +30,12 @@ class CameraController:
 
     def check_available_cameras(self):
         """Probes basic indices to see what's actually available on the system."""
+        # Fail fast if in cooldown
+        if time.time() - self.last_fail_time < 60:
+            return []
+            
         available = []
-        for idx in range(10):
+        for idx in [0, 1]: # Only check primary indices to avoid hang
             cap = cv2.VideoCapture(idx)
             if cap.isOpened():
                 available.append(idx)
@@ -49,10 +54,18 @@ class CameraController:
                      return self.shared_camera
              except:
                  self.shared_camera = None
+        
+        # FAIL FAST: If we failed very recently, don't even try and block the thread
+        cooldown_period = 60 # seconds
+        time_since_fail = time.time() - self.last_fail_time
+        if time_since_fail < cooldown_period:
+            logger.info(f"[IDLE] Camera is in cooldown ({int(cooldown_period - time_since_fail)}s remaining).")
+            return None
 
-        max_attempts = 5
+        max_attempts = 2 # Reduced from 5 to avoid blocking Flask
         for attempt in range(max_attempts):
-            indices_to_try = [self.camera_index] + [i for i in range(5) if i != self.camera_index]
+            # Only try index 0 and 1 on Pi Zero to save time
+            indices_to_try = [0, 1] if self.camera_index not in [0, 1] else [self.camera_index, 1 - self.camera_index]
             
             for idx in indices_to_try:
                 # Try multiple backends: V4L2 first, then default
@@ -63,7 +76,7 @@ class CameraController:
                         cap = cv2.VideoCapture(idx, backend)
                         if cap.isOpened():
                             # CRITICAL: Give camera a moment to initialize hardware buffers
-                            time.sleep(1.2) # Increased for stability
+                            time.sleep(0.8) # Slightly reduced for faster fail-over
                             
                             # LIMP MODE: Force 320x240 to save USB bandwidth on Pi Zero
                             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
@@ -72,7 +85,7 @@ class CameraController:
                             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                             
                             # Warm-up: Read and discard first few frames to stabilize exposure/balance
-                            for _ in range(5):
+                            for _ in range(3): # Reduced from 5
                                 cap.grab() 
                             
                             # Test if we can actually read a valid frame
@@ -95,14 +108,18 @@ class CameraController:
                                 logger.warning(f"[FAIL] Camera {idx} opened but failed to read frame.")
                                 cap.release()
                         else:
-                            logger.warning(f"[FAIL] Camera {idx} could not be opened with backend {backend}")
+                            # Faster fail if device won't even open
+                            pass 
                     except Exception as e:
                         logger.warning(f"Error opening camera {idx}: {e}")
             
-            # USB Recovery Sleep: Wait for the hub to stabilize before retry
+            # USB Recovery Sleep: Only if we haven't given up yet
             if attempt < max_attempts - 1:
-                logger.info("[RECOVERY] Sleeping 2.0s to allow USB hub reset...")
-                time.sleep(2.0)
+                time.sleep(1.0)
+        
+        # Mark failure time to trigger cooldown
+        self.last_fail_time = time.time()
+        return None
                 
         return None
 
