@@ -62,15 +62,22 @@ class CameraController:
                         logger.info(f"[PROBE] Trying index {idx} with backend {backend}")
                         cap = cv2.VideoCapture(idx, backend)
                         if cap.isOpened():
+                            # CRITICAL: Give camera a moment to initialize hardware buffers
+                            time.sleep(1.0)
+                            
                             # Set format to MJPEG
                             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
                             cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                             
-                            # Test if we can actually read a frame
+                            # Warm-up: Read and discard first few frames to stabilize exposure/balance
+                            for _ in range(5):
+                                cap.grab() # grab is faster than read() if we don't need the frame
+                            
+                            # Test if we can actually read a valid frame
                             success, frame = cap.read()
-                            if success:
+                            if success and frame is not None:
                                 logger.info(f"[SUCCESS] Camera {idx} is UP and providing frames.")
                                 self.camera_index = idx 
                                 self.shared_camera = cap
@@ -78,6 +85,8 @@ class CameraController:
                             else:
                                 logger.warning(f"[FAIL] Camera {idx} opened but failed to read frame.")
                                 cap.release()
+                        else:
+                            logger.warning(f"[FAIL] Camera {idx} could not be opened with backend {backend}")
                     except Exception as e:
                         logger.warning(f"Error opening camera {idx}: {e}")
             

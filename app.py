@@ -118,6 +118,11 @@ class ApplicationSystem:
         metadata = {"temp": temp, "hum": hum, "harvest": harvest}
         success = self.camera_controller.capture_timelapse_frame(metadata=metadata)
         
+        if success:
+            logger.info(f"[TIMELAPSE] {'Manual' if is_manual else 'Automatic'} capture SUCCESSFUL.")
+        else:
+            logger.error(f"[TIMELAPSE] {'Manual' if is_manual else 'Automatic'} capture FAILED.")
+            
         if restore_main:
             self.led_controller.led_control("main", GPIO_PINS["main_led"], False)
             
