@@ -85,9 +85,11 @@ class CameraController:
                             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
                             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                             
-                            # Warm-up: Read and discard first few frames to stabilize exposure/balance
-                            for _ in range(5): # Back to 5 for better stability
-                                cap.grab() 
+                            # Warm-up: Discard enough frames for AGC/AEC to fully converge.
+                            # The Redragon/Sonix sensor needs ~25 frames (~1s at 30fps) to
+                            # stabilize auto-exposure after opening. Fewer frames = overexposed captures.
+                            for _ in range(25):
+                                cap.grab()
                             
                             # Test if we can actually read a valid frame
                             success, frame = cap.read()
@@ -194,9 +196,13 @@ class CameraController:
                 logger.error("Could not find or open any camera for timelapse")
                 return False
                 
-            # Give camera a moment to adjust brightness/focus if we just opened it
-            if release_needed:
-                time.sleep(1.0) 
+            # Flush stale frames from the buffer before the real capture.
+            # Even after _get_camera() warmup, OpenCV buffers up to BUFFERSIZE frames.
+            # Reading immediately can yield an old (overexposed) frame from the warmup phase.
+            # We grab-and-discard to force a fresh frame from the sensor.
+            flush_count = 15 if release_needed else 3
+            for _ in range(flush_count):
+                camera.grab()
                 
             success, frame = camera.read()
             
