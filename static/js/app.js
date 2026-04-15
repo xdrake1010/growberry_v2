@@ -1176,6 +1176,9 @@ const app = {
             this.loadWifiStatus();
             this.checkApStatus();
         }
+        if (name === 'system') {
+            this.loadSystemVersion();
+        }
     },
 
     // ──────────────────────────────────────────────────────────
@@ -1395,6 +1398,80 @@ const app = {
             this.checkApStatus();
         } finally {
             btn.disabled = false;
+        }
+    },
+
+    // ──────────────────────────────────────────────────────────
+    // OTA Update Management
+    // ──────────────────────────────────────────────────────────
+
+    async loadSystemVersion() {
+        const branchEl = document.getElementById('sys-branch');
+        const commitEl = document.getElementById('sys-commit');
+        const msgEl = document.getElementById('sys-msg');
+        
+        try {
+            const res = await fetch('/api/system/update/version');
+            const data = await res.json();
+            if (branchEl) branchEl.innerHTML = `<i class="fa-solid fa-code-branch"></i> ${data.branch}`;
+            if (commitEl) commitEl.textContent = data.commit;
+            if (msgEl) msgEl.textContent = data.message;
+        } catch(e) {
+            console.error("Failed to load version", e);
+            if (msgEl) msgEl.textContent = "Error loading system version info.";
+        }
+    },
+
+    async updateSystem() {
+        const btn = document.getElementById('sys-update-btn');
+        if (!confirm("Update Growberry to the latest version? The system will restart during this process.")) {
+            return;
+        }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading Update...';
+        
+        try {
+            const res = await fetch('/api/system/update/pull', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ branch: 'master' })
+            });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                this.showToast("Update downloaded! Rebooting services...", false, 5000);
+                btn.innerHTML = '<i class="fa-solid fa-power-off"></i> Rebooting...';
+                
+                // Poll until backend is back up, then refresh
+                let attempts = 0;
+                const poll = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const ping = await fetch('/api/system/update/version', { signal: AbortSignal.timeout(1500) });
+                        if (ping.ok) {
+                            clearInterval(poll);
+                            this.showToast("System updated successfully!");
+                            setTimeout(() => window.location.reload(), 1000);
+                        }
+                    } catch(err) {
+                        // Backend still down
+                    }
+                    if (attempts > 30) {
+                        clearInterval(poll);
+                        this.showToast("Update might have failed. Please reload manually.", true);
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa-solid fa-download"></i> Update Now';
+                    }
+                }, 2000);
+
+            } else {
+                throw new Error(data.message);
+            }
+        } catch(e) {
+            this.showToast(`Update failed: ${e.message}`, true);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-download"></i> Update Now';
         }
     }
 };

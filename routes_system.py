@@ -195,3 +195,52 @@ def ap_stop():
         return jsonify({"status": "success", "message": "AP Mode stopped"})
     else:
         return jsonify({"status": "error", "message": msg}), 500
+
+# ──────────────────────────────────────────────────────────────────────────────
+# OTA Updates
+# ──────────────────────────────────────────────────────────────────────────────
+
+@system_bp.route('/update/version', methods=['GET'])
+def get_version():
+    """Returns the current git branch and commit hash."""
+    branch_out, _, _ = _run("git rev-parse --abbrev-ref HEAD")
+    commit_out, _, _ = _run("git rev-parse --short HEAD")
+    msg_out, _, _ = _run("git log -1 --pretty=%B")
+    
+    return jsonify({
+        "branch": branch_out or "unknown",
+        "commit": commit_out or "unknown",
+        "message": msg_out.strip() if msg_out else ""
+    })
+
+@system_bp.route('/update/pull', methods=['POST'])
+def update_system():
+    """Pulls latest changes and schedules a service restart."""
+    data = request.get_json() or {}
+    branch = data.get("branch", "master").strip()
+    
+    # 1. Fetch
+    out, err, rc = _run("git fetch origin")
+    if rc != 0:
+        return jsonify({"status": "error", "message": f"Fetch failed: {err}"}), 500
+        
+    # 2. Reset hard to the new origin/branch
+    out2, err2, rc2 = _run(f"git reset --hard origin/{branch}")
+    if rc2 != 0:
+        return jsonify({"status": "error", "message": f"Reset failed: {err2}"}), 500
+        
+    # 3. Schedule a restart in 2 seconds so this HTTP request has time to return
+    # We use nohup to detach it completely.
+    try:
+        subprocess.Popen(
+            "sleep 2 && sudo systemctl restart growberry",
+            shell=True,
+            start_new_session=True
+        )
+        return jsonify({
+            "status": "success", 
+            "message": "Update applied successfully. System is restarting...",
+            "details": out2
+        })
+    except Exception as e:
+         return jsonify({"status": "error", "message": f"Updated, but restart failed: {str(e)}"}), 500
