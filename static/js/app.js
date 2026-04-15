@@ -1174,6 +1174,7 @@ const app = {
         });
         if (name === 'network') {
             this.loadWifiStatus();
+            this.checkApStatus();
         }
     },
 
@@ -1324,6 +1325,76 @@ const app = {
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<i class="fa-solid fa-plug"></i> Connect';
+        }
+    },
+
+    // ──────────────────────────────────────────────────────────
+    // AP Mode Management
+    // ──────────────────────────────────────────────────────────
+
+    async checkApStatus() {
+        try {
+            const res = await fetch('/api/system/wifi/ap/status');
+            const data = await res.json();
+            const ind = document.getElementById('ap-status-indicator');
+            const text = document.getElementById('ap-status-text');
+            const btn = document.getElementById('ap-toggle-btn');
+            const details = document.getElementById('ap-details');
+            const wifiCard = document.getElementById('wifi-status-card');
+
+            if (data.ap_active) {
+                if (ind) ind.className = 'ap-indicator active';
+                if (text) text.textContent = 'AP Mode Active';
+                if (btn) btn.innerHTML = 'Disable Hotspot';
+                if (details) details.classList.remove('hidden');
+                if (wifiCard) wifiCard.style.opacity = '0.5';
+            } else {
+                if (ind) ind.className = 'ap-indicator';
+                if (text) text.textContent = 'AP Mode Disabled';
+                if (btn) btn.innerHTML = 'Enable Hotspot';
+                if (details) details.classList.add('hidden');
+                if (wifiCard) wifiCard.style.opacity = '1';
+            }
+        } catch(e) { console.error('Error checking AP status', e); }
+    },
+
+    async toggleApMode() {
+        const btn = document.getElementById('ap-toggle-btn');
+        const isActive = btn.innerHTML.includes('Disable');
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+        
+        const endpoint = isActive ? '/api/system/wifi/ap/stop' : '/api/system/wifi/ap/start';
+        
+        if (!isActive) {
+            alert("WARNING: Enabling AP mode will disconnect you from the current WiFi network. You will need to reconnect to 'Growberry' to access this dashboard.");
+        }
+
+        try {
+            const res = await fetch(endpoint, { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                this.showToast(data.message);
+                if (isActive) {
+                    // Give it a moment to reconnect to wifi
+                    setTimeout(() => {
+                        this.checkApStatus();
+                        this.loadWifiStatus();
+                    }, 4000);
+                } else {
+                    this.checkApStatus();
+                }
+            } else {
+                this.showToast('Failed: ' + data.message, true);
+                this.checkApStatus();
+            }
+        } catch(e) {
+            this.showToast('Network error while toggling AP Mode', true);
+            this.checkApStatus();
+        } finally {
+            btn.disabled = false;
         }
     }
 };

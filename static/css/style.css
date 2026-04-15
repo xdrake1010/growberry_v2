@@ -1480,3 +1480,70 @@ select:focus {
     font-weight: 700; font-size: 14px; text-align: center;
     margin-bottom: 20px; word-break: break-all;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   AP Mode Section
+═══════════════════════════════════════════════════════════ */
+
+.ap-mode-section {
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.1);
+}
+
+.ap-status-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+}
+
+.ap-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: all 0.3s;
+}
+
+.ap-indicator.active {
+    background: var(--warning);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+    animation: pulseAp 2s infinite;
+}
+
+@keyframes pulseAp {
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.ap-status-text {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.ap-details {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    background: rgba(245, 158, 11, 0.05);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+    border-radius: 8px;
+}
+
+.ap-cred {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.ap-cred span {
+    color: var(--text-muted);
+}

@@ -4,6 +4,7 @@ All routes registered under /api/system via blueprint.
 """
 import subprocess
 import logging
+import net_manager
 from flask import Blueprint, jsonify, request
 
 logger = logging.getLogger("Growberry.System")
@@ -166,3 +167,31 @@ def wifi_forget():
         return jsonify({"status": "success", "message": f"Forgot {ssid}"})
     else:
         return jsonify({"status": "error", "message": err or "Failed to forget network"}), 500
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AP Mode Management
+# ──────────────────────────────────────────────────────────────────────────────
+
+@system_bp.route('/wifi/ap/status', methods=['GET'])
+def ap_status():
+    """Check if AP mode is currently active."""
+    return jsonify({"ap_active": net_manager.is_ap_active()})
+
+@system_bp.route('/wifi/ap/start', methods=['POST'])
+def ap_start():
+    """Activate AP Mode manually."""
+    success, msg = net_manager.start_ap_mode()
+    if success:
+        return jsonify({"status": "success", "message": "AP Mode active"})
+    else:
+        return jsonify({"status": "error", "message": msg}), 500
+
+@system_bp.route('/wifi/ap/stop', methods=['POST'])
+def ap_stop():
+    """Stop AP Mode and return to WiFi client mode."""
+    success, msg = net_manager.stop_ap_mode()
+    if success:
+        return jsonify({"status": "success", "message": "AP Mode stopped"})
+    else:
+        return jsonify({"status": "error", "message": msg}), 500
