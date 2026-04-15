@@ -140,11 +140,13 @@ class CameraController:
             alpha = 0.6
             frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
             
-            # Text properties
+            # Text properties - Beefed up for better readability at low resolutions
             font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = h / 1000.0 * 0.75
+            # Increase base scale for better status on small resolutions
+            font_scale = max(0.4, h / 450.0) 
             font_color = (255, 255, 255)
-            thickness = 1
+            thickness = 1 # Keeping 1 for now but with shadow it will be much clearer
+            if h > 480: thickness = 2 # Bold for higher res
             
             # Content
             harvest_name = metadata.get("harvest", self.cosecha_name).upper()
@@ -162,13 +164,20 @@ class CameraController:
                     day_text = f" | DAY {max(1, diff_days)}"
                 except: pass
 
-            # Draw Left: Branding + Harvest + Day
-            cv2.putText(frame, f"GROWBERRY | {harvest_name}{day_text}", (20, h - int(bar_height/2) + 5), 
+            # Branding + Harvest + Day details
+            brand_text = f"GROWBERRY | {harvest_name}{day_text}"
+            stats_str = f"{temp} | {hum} | {time_str}"
+            
+            # Draw Shadow for extra clarity (Offset by 1px)
+            cv2.putText(frame, brand_text, (21, h - int(bar_height/2) + 6), 
+                        font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+            cv2.putText(frame, brand_text, (20, h - int(bar_height/2) + 5), 
                         font, font_scale, font_color, thickness, cv2.LINE_AA)
             
             # Draw Right: Stats
-            stats_str = f"{temp} | {hum} | {time_str}"
             text_size = cv2.getTextSize(stats_str, font, font_scale, thickness)[0]
+            cv2.putText(frame, stats_str, (w - text_size[0] - 19, h - int(bar_height/2) + 6), 
+                        font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
             cv2.putText(frame, stats_str, (w - text_size[0] - 20, h - int(bar_height/2) + 5), 
                         font, font_scale, font_color, thickness, cv2.LINE_AA)
             
