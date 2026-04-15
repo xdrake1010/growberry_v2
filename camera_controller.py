@@ -182,9 +182,6 @@ class CameraController:
         except Exception as e:
             logger.error(f"Error drawing HD overlay: {e}")
             return frame
-        except Exception as e:
-            logger.error(f"Error drawing overlay: {e}")
-            return frame
 
     def capture_timelapse_frame(self, metadata=None):
         """Captures a single frame safely and saves it to the timelapse directory structure."""

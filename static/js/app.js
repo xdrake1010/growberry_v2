@@ -758,17 +758,29 @@ const app = {
         const lb = document.getElementById('lightbox');
         const img = document.getElementById('lightbox-img');
         const cap = document.getElementById('lightbox-caption');
+        const downBtn = document.getElementById('lightbox-download');
         
         img.src = url;
         cap.textContent = caption;
+        
+        if (downBtn) {
+            downBtn.href = url;
+            downBtn.download = url.split('/').pop() || 'capture.jpg';
+        }
+        
         lb.classList.remove('hidden');
         document.body.style.overflow = 'hidden'; // Prevent scrolling
     },
 
-    closeLightbox() {
+    closeLightbox(e) {
+        if (e && e.target.id !== 'lightbox') return; // Only close if clicking background
+        this.forceCloseLightbox();
+    },
+    
+    forceCloseLightbox() {
         const lb = document.getElementById('lightbox');
         lb.classList.add('hidden');
-        document.body.style.overflow = 'auto';
+        document.body.style.overflow = 'auto'; // Restore scroll
     },
 
     async fetchCameraStatus() {

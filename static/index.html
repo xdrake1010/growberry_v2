@@ -355,8 +355,11 @@
     </div>
 
     <!-- Lightbox Modal -->
-    <div id="lightbox" class="lightbox hidden" onclick="app.closeLightbox()">
-        <span class="close-lightbox">&times;</span>
+    <div id="lightbox" class="lightbox hidden" onclick="app.closeLightbox(event)">
+        <div class="lightbox-toolbar">
+            <a id="lightbox-download" href="#" download class="btn primary sm"><i class="fa-solid fa-download"></i> Download</a>
+            <span class="close-lightbox" onclick="app.forceCloseLightbox()">&times;</span>
+        </div>
         <img id="lightbox-img" src="" alt="Full view">
         <div id="lightbox-caption" class="lightbox-caption"></div>
     </div>

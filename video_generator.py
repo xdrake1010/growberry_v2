@@ -71,11 +71,12 @@ class VideoGenerator:
             output_filename = f"{cosecha_name}{range_suffix}_{datetime.now().strftime('%Y%m%d_%H%M')}.mp4"
             output_path = os.path.join(EXPORTS_DIR, output_filename)
 
-            # FFmpeg Command - Optimized for Pi Zero
+            # FFmpeg Command - Optimized for Pi Zero and forced to 720p HD via scaling
             cmd = [
                 'ffmpeg', '-y', '-f', 'concat', '-safe', '0', 
                 '-i', manifest_path, 
-                '-vcodec', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', 
+                '-vf', 'scale=1280:-2,format=yuv420p',
+                '-vcodec', 'libx264', '-preset', 'ultrafast', 
                 '-r', str(fps), output_path
             ]
             
