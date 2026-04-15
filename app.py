@@ -117,11 +117,11 @@ class ApplicationSystem:
             
             # Fetch start date and resolution if available
             start_date = None
-            resolution = "320x240"
+            resolution = "640x480"  # Default: SD quality for timelapse frames
             if harvest in self.config_data.get("plants", {}):
                 plant_cfg = self.config_data["plants"][harvest]
                 start_date = plant_cfg.get("start_date")
-                resolution = plant_cfg.get("timelapse_resolution", "320x240")
+                resolution = plant_cfg.get("timelapse_resolution", "640x480")
         
         metadata = {
             "temp": temp, 

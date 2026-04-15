@@ -1207,3 +1207,124 @@ select:focus {
     min-height: 20px;
     word-break: break-all;
 }
+
+/* Live Feed Resolution Pills */
+.feed-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    justify-content: center;
+    margin-top: 14px;
+    padding: 10px 16px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+}
+
+.feed-ctrl-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.feed-res-pills {
+    display: flex;
+    gap: 6px;
+}
+
+.res-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.res-pill:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-main);
+}
+
+.res-pill.active {
+    background: var(--accent-primary);
+    color: #000;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+/* Video Export — Harvest Groups */
+.video-harvest-group {
+    margin-bottom: 24px;
+}
+
+.harvest-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    user-select: none;
+    margin-bottom: 14px;
+}
+
+.harvest-group-header:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: var(--accent-primary);
+}
+
+.harvest-group-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text-main);
+}
+
+.harvest-group-title i {
+    color: var(--accent-primary);
+    font-size: 16px;
+}
+
+.harvest-video-count {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.06);
+    padding: 2px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+}
+
+.harvest-group-chevron {
+    color: var(--text-muted);
+    font-size: 13px;
+    transition: transform 0.25s;
+}
+
+.harvest-group-body {
+    overflow: hidden;
+    transition: max-height 0.35s ease, opacity 0.25s ease;
+    max-height: 2000px;
+    opacity: 1;
+}
+
+.harvest-group-body.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+

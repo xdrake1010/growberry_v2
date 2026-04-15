@@ -376,10 +376,22 @@ const app = {
     reloadFeed() {
         const img = document.getElementById('live-video');
         img.src = '';
+        const res = this._currentLiveRes || '640x480';
         setTimeout(() => {
-            img.src = '/api/video_feed?' + new Date().getTime();
+            img.src = `/api/video_feed?res=${res}&t=${Date.now()}`;
         }, 100);
         this.showToast('Camera feed reloaded');
+    },
+
+    changeLiveResolution(res) {
+        this._currentLiveRes = res;
+        const img = document.getElementById('live-video');
+        img.src = `/api/video_feed?res=${res}&t=${Date.now()}`;
+        // Update pill active state
+        document.querySelectorAll('.res-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.res === res);
+        });
+        this.showToast(`Stream: ${res}`);
     },
 
     async captureFrame() {
@@ -780,41 +792,76 @@ const app = {
             container.classList.remove('hidden');
             list.innerHTML = '';
 
+            // Group by harvest name
+            const groups = {};
             data.forEach(video => {
-                const card = document.createElement('div');
-                card.className = 'video-card';
+                const h = video.harvest || 'Unknown';
+                if (!groups[h]) groups[h] = [];
+                groups[h].push(video);
+            });
 
-                const nameParts = video.name.split('_');
-                const harvestName = nameParts[0] || 'Unknown';
-                const dateRaw = nameParts[1] || '';
-                const displayDate = dateRaw.length === 8
-                    ? `${dateRaw.slice(0,4)}-${dateRaw.slice(4,6)}-${dateRaw.slice(6,8)}`
-                    : video.date;
+            Object.entries(groups).forEach(([harvestName, videos]) => {
+                const groupEl = document.createElement('div');
+                groupEl.className = 'video-harvest-group';
 
-                const streamUrl = `/api/timelapse/stream/${video.name}`;
-                const downloadUrl = `/api/timelapse/download/${video.name}`;
+                const isOpen = this._videoGroupState?.[harvestName] !== false; // default open
 
-                card.innerHTML = `
-                    <div class="card-header">
-                        <h4>${harvestName}</h4>
-                        <button class="btn-icon danger" onclick="app.deleteVideo('${video.name}')"><i class="fa-solid fa-trash-can"></i></button>
+                groupEl.innerHTML = `
+                    <div class="harvest-group-header" onclick="app._toggleVideoGroup('${harvestName}', this)">
+                        <div class="harvest-group-title">
+                            <i class="fa-solid fa-leaf"></i>
+                            <span>${harvestName}</span>
+                            <span class="harvest-video-count">${videos.length} video${videos.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-${isOpen ? 'up' : 'down'} harvest-group-chevron"></i>
                     </div>
-                    <video class="export-video-player" controls preload="metadata" src="${streamUrl}">
-                        Your browser does not support HTML5 video.
-                    </video>
-                    <div class="video-meta">
-                        <span><i class="fa-solid fa-calendar"></i> ${displayDate}</span>
-                        <span><i class="fa-solid fa-clock"></i> ${video.date.split(' ')[1] || ''}</span>
-                        <span><i class="fa-solid fa-weight-hanging"></i> ${video.size}</span>
-                        <span><i class="fa-solid fa-file-invoice"></i> ${video.name}</span>
-                    </div>
-                    <div class="card-actions">
-                        <a href="${downloadUrl}" class="btn primary sm"><i class="fa-solid fa-download"></i> Download MP4</a>
+                    <div class="harvest-group-body ${isOpen ? '' : 'collapsed'}">
+                        <div class="exports-grid harvest-videos-grid"></div>
                     </div>
                 `;
-                list.appendChild(card);
+
+                const grid = groupEl.querySelector('.harvest-videos-grid');
+                videos.forEach(video => {
+                    const card = document.createElement('div');
+                    card.className = 'video-card';
+                    const streamUrl = `/api/timelapse/stream/${video.name}`;
+                    const downloadUrl = `/api/timelapse/download/${video.name}`;
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <h4>${video.name.split('_').slice(-2).join(' ').replace(/\.mp4$/, '') || video.name}</h4>
+                            <button class="btn-icon danger" onclick="app.deleteVideo('${video.name}')"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                        <video class="export-video-player" controls preload="metadata" src="${streamUrl}">
+                            Your browser does not support HTML5 video.
+                        </video>
+                        <div class="video-meta">
+                            <span><i class="fa-solid fa-calendar"></i> ${video.date.split(' ')[0]}</span>
+                            <span><i class="fa-solid fa-clock"></i> ${video.date.split(' ')[1] || ''}</span>
+                            <span><i class="fa-solid fa-weight-hanging"></i> ${video.size}</span>
+                        </div>
+                        <div class="card-actions">
+                            <a href="${downloadUrl}" class="btn primary sm"><i class="fa-solid fa-download"></i> Download MP4</a>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+
+                list.appendChild(groupEl);
             });
+
         } catch(e) { console.error('Failed to load exports', e); }
+    },
+
+    _videoGroupState: {},
+
+    _toggleVideoGroup(name, headerEl) {
+        const body = headerEl.closest('.video-harvest-group').querySelector('.harvest-group-body');
+        const chevron = headerEl.querySelector('.harvest-group-chevron');
+        const isOpen = !body.classList.contains('collapsed');
+        body.classList.toggle('collapsed', isOpen);
+        chevron.className = `fa-solid fa-chevron-${isOpen ? 'down' : 'up'} harvest-group-chevron`;
+        if (!this._videoGroupState) this._videoGroupState = {};
+        this._videoGroupState[name] = !isOpen;
     },
 
     openLightbox(url, caption) {

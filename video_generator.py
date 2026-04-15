@@ -16,17 +16,25 @@ RESOLUTIONS = {
     "1080p": (1920, 1080),
 }
 
+# Font for FFmpeg drawtext overlay — DejaVuSans-Bold is available on Raspberry Pi OS
+OVERLAY_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+def _escape_ffmpeg_text(text):
+    """Escape special characters for FFmpeg drawtext filter."""
+    return text.replace("'", "\\'").replace(":", "\\:").replace("\\", "\\\\")
+
+
 class VideoGenerator:
     def __init__(self):
         if not os.path.exists(EXPORTS_DIR):
             os.makedirs(EXPORTS_DIR, exist_ok=True)
         self.is_exporting = False
         self.current_job = None
-        self.progress = 0          # 0-100
-        self.progress_status = ""  # human-readable status message
+        self.progress = 0          # 0–100
+        self.progress_status = ""  # human-readable status
 
     def export_cosecha(self, cosecha_name, fps=10, date_from=None, date_to=None, resolution="720p"):
-        """Starts an async export job. resolution: '480p', '720p', or '1080p'."""
+        """Starts an async export. resolution: '480p', '720p', or '1080p'."""
         if self.is_exporting:
             return False, "Export already in progress."
         thread = threading.Thread(
@@ -44,6 +52,41 @@ class VideoGenerator:
             "progress": self.progress,
             "status": self.progress_status,
         }
+
+    def _build_overlay_filter(self, res_w, res_h, brand_text, stats_text):
+        """Build FFmpeg drawtext filter chain for HD overlay burned at export time."""
+        font = OVERLAY_FONT
+        # Font size relative to output height — legible at 480p through 1080p
+        font_size = max(20, res_h // 28)
+        box_h = font_size + 24  # padding
+        y_pos = f"h-{box_h + 8}"
+
+        brand_esc = _escape_ffmpeg_text(brand_text)
+        stats_esc = _escape_ffmpeg_text(stats_text)
+
+        # Left side — brand + harvest + day
+        left = (
+            f"drawtext=fontfile='{font}'"
+            f":text='{brand_esc}'"
+            f":fontsize={font_size}"
+            f":fontcolor=white"
+            f":x=20"
+            f":y={y_pos}"
+            f":box=1:boxcolor=0x1E2127CC:boxborderw=10"
+        )
+
+        # Right side — date/time
+        right = (
+            f"drawtext=fontfile='{font}'"
+            f":text='{stats_esc}'"
+            f":fontsize={font_size}"
+            f":fontcolor=white"
+            f":x=w-tw-20"
+            f":y={y_pos}"
+            f":box=1:boxcolor=0x1E2127CC:boxborderw=10"
+        )
+
+        return f"{left},{right}"
 
     def _run_export(self, cosecha_name, fps, date_from, date_to, resolution):
         self.is_exporting = True
@@ -83,7 +126,7 @@ class VideoGenerator:
                 return
 
             total = len(all_images)
-            logger.info(f"Exporting {total} frames at {fps}fps → {res_w}x{res_h}")
+            logger.info(f"Exporting {total} frames @ {fps}fps → {res_w}x{res_h} [{resolution}]")
             self.progress_status = f"Building manifest ({total} frames)..."
             self.progress = 5
 
@@ -103,14 +146,36 @@ class VideoGenerator:
             output_path = os.path.join(EXPORTS_DIR, output_filename)
 
             self.progress = 10
-            self.progress_status = f"Encoding {total} frames to {res_w}x{res_h} {resolution}..."
+            self.progress_status = f"Encoding {total} frames → {res_w}x{res_h} {resolution}..."
 
-            # Scale preserving aspect ratio + letterbox pad + faststart for browser playback
-            vf = (
+            # ── Compute overlay text ──────────────────────────────────────────
+            brand_text = f"GROWBERRY | {cosecha_name.upper()}"
+
+            # Compute day number from date_from (or first image date)
+            start_date_str = date_from or (date_folders[0] if date_folders else None)
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
+                    # Day range: Day N → Day M
+                    if date_from and date_to:
+                        end_dt = datetime.strptime(date_to, "%Y-%m-%d")
+                        day_start = max(1, (start_dt - datetime.strptime(start_date_str, "%Y-%m-%d")).days + 1) if date_from else 1
+                        day_end = max(1, (end_dt - start_dt).days + 1)
+                        brand_text += f" | DAY 1-{day_end}"
+                except Exception:
+                    pass
+
+            export_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            stats_text = f"{total} frames | {fps:.0f}fps | {export_date}"
+
+            # ── FFmpeg filter chain ───────────────────────────────────────────
+            # Scale with letterbox + burn HD overlay at output resolution
+            scale_pad = (
                 f"scale={res_w}:{res_h}:force_original_aspect_ratio=decrease,"
-                f"pad={res_w}:{res_h}:(ow-iw)/2:(oh-ih)/2:black,"
-                f"format=yuv420p"
+                f"pad={res_w}:{res_h}:(ow-iw)/2:(oh-ih)/2:black"
             )
+            overlay = self._build_overlay_filter(res_w, res_h, brand_text, stats_text)
+            vf = f"{scale_pad},{overlay},format=yuv420p"
 
             cmd = [
                 'ffmpeg', '-y',
@@ -118,24 +183,22 @@ class VideoGenerator:
                 '-i', manifest_path,
                 '-vf', vf,
                 '-vcodec', 'libx264', '-preset', 'ultrafast',
-                '-movflags', '+faststart',   # moov atom at front → browser can stream
+                '-movflags', '+faststart',
                 '-r', str(fps),
                 output_path
             ]
 
             logger.info(f"FFmpeg: {' '.join(cmd)}")
 
-            # Run ffmpeg and track progress via stderr line count
+            # Run and track progress via stderr
             proc = subprocess.Popen(
                 cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
                 text=True, bufsize=1
             )
-            frame_count = 0
             for line in proc.stderr:
                 if 'frame=' in line:
                     try:
                         fc = int(line.split('frame=')[1].split()[0])
-                        frame_count = fc
                         pct = min(10 + int((fc / total) * 85), 95)
                         self.progress = pct
                         self.progress_status = f"Encoding frame {fc}/{total}..."
@@ -153,7 +216,7 @@ class VideoGenerator:
                 self.progress = 100
                 self.progress_status = f"Done! {output_filename} ({size_mb:.1f} MB)"
             else:
-                logger.error("FFmpeg failed.")
+                logger.error("FFmpeg failed — check logs for drawtext/font errors.")
                 self.progress_status = "Error: FFmpeg encoding failed."
 
         except Exception as e:
@@ -177,15 +240,30 @@ class VideoGenerator:
             return False, str(e)
 
     def list_exports(self):
+        """Lists all MP4 exports. Parses harvest name from filename prefix."""
         if not os.path.exists(EXPORTS_DIR):
             return []
         files = []
         for file in sorted(os.listdir(EXPORTS_DIR), reverse=True):
-            if file.endswith(".mp4"):
-                stats = os.stat(os.path.join(EXPORTS_DIR, file))
-                files.append({
-                    "name": file,
-                    "size": f"{stats.st_size / (1024*1024):.1f} MB",
-                    "date": datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M")
-                })
+            if not file.endswith(".mp4"):
+                continue
+            stats = os.stat(os.path.join(EXPORTS_DIR, file))
+            # Filename pattern: HarvestName_daterange_timestamp.mp4
+            # Extract harvest = everything before the first date segment (8 digits)
+            harvest = file.split('.')[0]  # strip .mp4
+            # Find first underscore-separated segment that looks like a date (8 digits)
+            parts = harvest.split('_')
+            harvest_parts = []
+            for part in parts:
+                if part.isdigit() and len(part) == 8:
+                    break
+                harvest_parts.append(part)
+            harvest_name = "_".join(harvest_parts) if harvest_parts else harvest
+
+            files.append({
+                "name": file,
+                "harvest": harvest_name,
+                "size": f"{stats.st_size / (1024*1024):.1f} MB",
+                "date": datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M")
+            })
         return files

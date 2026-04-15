@@ -200,7 +200,8 @@ class CameraController:
             return frame
 
     def capture_timelapse_frame(self, metadata=None):
-        """Captures a single frame safely and saves it to the timelapse directory structure."""
+        """Captures a single frame and saves a clean JPEG (no overlay).
+        The overlay is burned by FFmpeg at export time for full HD quality."""
         today_str = datetime.now().strftime("%Y-%m-%d")
         timestamp = datetime.now().strftime("%H%M%S")
         
@@ -212,27 +213,22 @@ class CameraController:
 
         logger.info(f"Capturing timelapse frame: {filename}")
         
-        camera = None
         release_needed = False
         
         try:
-            # Parse requested resolution from metadata or use default 240p for now
-            res_str = metadata.get("resolution", "320x240")
+            # Parse requested resolution from metadata, default 640x480
+            res_str = metadata.get("resolution", "640x480") if metadata else "640x480"
             w, h = map(int, res_str.split('x'))
             
             with self.lock:
-                # If shared is already at the correct res, keep it
                 camera = self._get_camera(width=w, height=h)
-                release_needed = False # We let it persist unless res change is needed next time
+                release_needed = False
             
             if camera is None:
                 logger.error("Could not find or open any camera for timelapse")
                 return False
                 
-            # Flush stale frames from the buffer before the real capture.
-            # Even after _get_camera() warmup, OpenCV buffers up to BUFFERSIZE frames.
-            # Reading immediately can yield an old (overexposed) frame from the warmup phase.
-            # We grab-and-discard to force a fresh frame from the sensor.
+            # Flush stale buffer frames before capture
             flush_count = 15 if release_needed else 3
             for _ in range(flush_count):
                 camera.grab()
@@ -240,13 +236,9 @@ class CameraController:
             success, frame = camera.read()
             
             if success:
-                # Apply metadata burn-in if provided
-                if metadata:
-                    frame = self._draw_metadata_overlay(frame, metadata)
-
-                # Save with good quality for timelapse
+                # Save clean frame — overlay is burned by FFmpeg at export time
                 cv2.imwrite(filepath, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
-                logger.info(f"Saved timelapse frame with metadata to {filepath}")
+                logger.info(f"Saved clean timelapse frame: {filepath}")
             else:
                 logger.error("Failed to read frame from camera")
             
@@ -260,18 +252,16 @@ class CameraController:
             logger.error(f"Error capturing timelapse: {e}")
             return False
 
-    def generate_live_stream(self):
-        """Generator for the MJPEG stream to serve to the web interface"""
+    def generate_live_stream(self, width=640, height=480):
+        """Generator for the MJPEG stream. Accepts resolution params for UI selector."""
         with self.lock:
             self.client_count += 1
             self.is_streaming = True
-            logger.info(f"Client connected. Total clients: {self.client_count}")
+            logger.info(f"Client connected at {width}x{height}. Total: {self.client_count}")
         
-        camera = None
         try:
-            # Re-probing sometimes helps if the driver hung
             with self.lock:
-                camera = self._get_camera()
+                camera = self._get_camera(width=width, height=height)
             
             if camera is None:
                 logger.error("Could not find or open any camera for streaming")
@@ -281,37 +271,37 @@ class CameraController:
 
             retry_count = 0
             while self.is_streaming:
-                # Thread-safe read
                 with self.lock:
                     if self.shared_camera is None or not self.shared_camera.isOpened():
-                         break
+                        break
                     success, frame = self.shared_camera.read()
                 
                 if not success:
-                    logger.warning(f"Failed to read frame during stream (retry {retry_count}/5)")
+                    logger.warning(f"Failed to read stream frame (retry {retry_count}/5)")
                     retry_count += 1
                     if retry_count > 5:
                         break
-                    time.sleep(0.5) 
+                    time.sleep(0.5)
                     continue
                 
                 retry_count = 0
                 
-                # Compress heavily for the live web feed
-                ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+                # Compress for web — heavier at higher res to balance bandwidth
+                quality = 60 if width >= 1280 else 55
+                ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
                 frame_bytes = buffer.tobytes()
                 
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
                 
-                # Cap FPS to ~10 to save memory and CPU on Pi Zero
-                time.sleep(0.1)
+                # Cap FPS: ~5fps at HD, ~10fps at SD to save CPU on Pi Zero
+                time.sleep(0.2 if width >= 1280 else 0.1)
         except Exception as e:
             logger.error(f"Error in live stream generator: {e}")
         finally:
             with self.lock:
                 self.client_count -= 1
-                logger.info(f"Client disconnected. Remaining clients: {self.client_count}")
+                logger.info(f"Client disconnected. Remaining: {self.client_count}")
                 if self.client_count <= 0:
                     self.client_count = 0
                     self.is_streaming = False

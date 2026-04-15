@@ -164,11 +164,19 @@
                     <div class="glass-panel video-container">
                         <h2>Live Feed</h2>
                         <div class="feed-wrapper">
-                            <img id="live-video" src="/api/video_feed" alt="Camera Live Feed" onerror="this.onerror=null; this.src='/placeholder-camera.jpg'; this.alt='Feed Unavailable';"/>
+                            <img id="live-video" src="/api/video_feed?res=640x480" alt="Camera Live Feed" onerror="this.onerror=null; this.src='/placeholder-camera.jpg'; this.alt='Feed Unavailable';"/>
                         </div>
                         <div class="camera-actions">
                             <button class="btn primary" onclick="app.captureFrame()"><i class="fa-solid fa-camera"></i> Manual Capture</button>
                             <button class="btn secondary" onclick="app.reloadFeed()"><i class="fa-solid fa-rotate"></i> Reload Stream</button>
+                        </div>
+                        <div class="feed-controls">
+                            <label class="feed-ctrl-label"><i class="fa-solid fa-expand"></i> Stream Quality</label>
+                            <div class="feed-res-pills">
+                                <button class="res-pill" data-res="320x240" onclick="app.changeLiveResolution('320x240')">320×240</button>
+                                <button class="res-pill active" data-res="640x480" onclick="app.changeLiveResolution('640x480')">640×480</button>
+                                <button class="res-pill" data-res="1280x720" onclick="app.changeLiveResolution('1280x720')">720p HD</button>
+                            </div>
                         </div>
                         <div class="camera-status-row">
                             <span class="status-item"><i class="fa-solid fa-seedling"></i> <span id="ov-cosecha">--</span></span>
@@ -177,6 +185,7 @@
                         </div>
                     </div>
                 </section>
+
 
                 <!-- Controls Tab -->
                 <section id="controls" class="tab-content">

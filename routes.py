@@ -16,7 +16,17 @@ def init_routes(system_instance):
 def video_feed():
     if not _system:
         return "System Not Init", 500
-    return Response(_system.camera_controller.generate_live_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    # Accept resolution via ?res=WxH (e.g. ?res=640x480)
+    res = request.args.get('res', '640x480')
+    try:
+        w, h = map(int, res.split('x'))
+    except Exception:
+        w, h = 640, 480
+    return Response(
+        _system.camera_controller.generate_live_stream(width=w, height=h),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
+
 
 @api.route('/statistics', methods=['GET'])
 def get_statistics():
