@@ -263,3 +263,58 @@ def list_exports():
 @api.route('/timelapse/download/<filename>', methods=['GET'])
 def download_video(filename):
     return send_from_directory(EXPORTS_DIR, filename, as_attachment=True)
+
+@api.route('/harvests/info', methods=['GET'])
+def get_harvests_info():
+    """Returns available date ranges and start dates for all harvests."""
+    config = load_plants_config()
+    info = {}
+    
+    # Get configuration start dates
+    for name, data in config.get("plants", {}).items():
+        info[name] = {
+            "config_start": data.get("start_date"),
+            "first_image": None,
+            "last_image": None
+        }
+        
+        # Check actual image dates in filesystem
+        cosecha_path = os.path.join(TIMELAPSE_BASE_DIR, name)
+        if os.path.exists(cosecha_path):
+            dates = sorted([d for d in os.listdir(cosecha_path) if os.path.isdir(os.path.join(cosecha_path, d))])
+            if dates:
+                info[name]["first_image"] = dates[0]
+                info[name]["last_image"] = dates[-1]
+                
+    return jsonify(info)
+
+@api.route('/harvests/<name>', methods=['DELETE'])
+def delete_harvest_plan(name):
+    """Deletes a harvest plan configuration from plants_config.json."""
+    try:
+        config = load_plants_config()
+        if name in config.get("plants", {}):
+            # Safety: don't delete the only harvest
+            if len(config["plants"]) <= 1:
+                return jsonify({"status": "error", "message": "Cannot delete the last remaining plan."}), 400
+                
+            # If deleting the active harvest, switch to another one
+            if config.get("active_cosecha") == name:
+                remaining = [k for k in config["plants"].keys() if k != name]
+                config["active_cosecha"] = remaining[0]
+            
+            del config["plants"][name]
+            save_plants_config(config)
+            
+            # Trigger hot-reload (same as set_configs but partial)
+            _system.config_data = config
+            _system.active_cosecha = config.get("active_cosecha")
+            _system.camera_controller.set_cosecha_name(_system.active_cosecha)
+            _system.schedule_manager.reload_config(config)
+            _system.schedule_manager.refresh_schedule()
+            _system.rebuild_scheduler()
+            
+            return jsonify({"status": "success", "message": f"Plan '{name}' deleted."})
+        return jsonify({"status": "error", "message": "Plan not found."}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

@@ -464,7 +464,7 @@ const app = {
                         <i class="fa-solid fa-trash-can"></i>
                     </button>
                 </div>
-                <i class="fa-solid fa-folder-closed"></i>
+                <i class="fa-solid fa-leaf"></i>
                 <strong>${cosecha.name}</strong>
                 <span>${cosecha.dates.length} Days tracked</span>
             `;
@@ -575,8 +575,8 @@ const app = {
         } catch(e) { this.showToast(e.message, true); }
     },
 
-    openExportModal() {
-        if(!this.fullConfig) this.fetchFullConfig();
+    async openExportModal() {
+        if(!this.fullConfig) await this.fetchFullConfig();
         const sel = document.getElementById('exp-cosecha-selector');
         sel.innerHTML = '';
         if(this.fullConfig?.plants) {
@@ -587,7 +587,48 @@ const app = {
                 sel.appendChild(opt);
             });
         }
+        
+        // Fetch harvest info for date helpers
+        try {
+            const res = await fetch('/api/harvests/info');
+            this.harvestsInfo = await res.json();
+        } catch(e) { console.error("Could not fetch harvest info", e); }
+        
         document.getElementById('export-modal').classList.remove('hidden');
+    },
+
+    setExportRange(type) {
+        const cosecha = document.getElementById('exp-cosecha-selector').value;
+        if (!this.harvestsInfo || !this.harvestsInfo[cosecha]) return;
+        
+        const info = this.harvestsInfo[cosecha];
+        if (type === 'start') {
+            const date = info.config_start || info.first_image;
+            if (date) document.getElementById('exp-date-from').value = date;
+        } else if (type === 'end') {
+            const date = info.last_image || new Date().toISOString().split('T')[0];
+            if (date) document.getElementById('exp-date-to').value = date;
+        }
+    },
+
+    async deleteHarvestPlan() {
+        const name = document.getElementById('cfg-load-selector').value;
+        if (!name) return;
+        
+        if (!confirm(`Are you sure you want to delete the plan "${name}"? This ONLY deletes the configuration, not the images.`)) {
+            return;
+        }
+        
+        try {
+            const res = await fetch(`/api/harvests/${name}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.status === 'success') {
+                this.showToast(data.message);
+                await this.fetchFullConfig();
+                this.loadConfigToForm();
+                this.fetchStats(); // Update UI if active harvest changed
+            } else { throw new Error(data.message); }
+        } catch(e) { this.showToast(e.message, true); }
     },
 
     closeExportModal() {

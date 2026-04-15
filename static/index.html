@@ -236,9 +236,12 @@
                         <div class="config-form">
                             <div class="input-group">
                                 <label>Load Saved Harvest</label>
-                                <select id="cfg-load-selector" onchange="app.loadSelectedHarvest()">
-                                    <option value="">-- Create New / Select --</option>
-                                </select>
+                                <div class="input-with-action">
+                                    <select id="cfg-load-selector" onchange="app.loadSelectedHarvest()">
+                                        <option value="">-- Create New / Select --</option>
+                                    </select>
+                                    <button class="btn danger sm" onclick="app.deleteHarvestPlan()" title="Delete Plan"><i class="fa-solid fa-trash"></i></button>
+                                </div>
                             </div>
                             <hr style="opacity:0.1; margin:10px 0;">
                             <div class="input-group">
@@ -356,11 +359,17 @@
             <div class="input-row">
                 <div class="input-group">
                     <label>From Date</label>
-                    <input type="date" id="exp-date-from">
+                    <div class="input-with-action">
+                        <input type="date" id="exp-date-from">
+                        <button class="btn secondary xs" onclick="app.setExportRange('start')" title="Harvest Start">Start</button>
+                    </div>
                 </div>
                 <div class="input-group">
                     <label>To Date</label>
-                    <input type="date" id="exp-date-to">
+                    <div class="input-with-action">
+                        <input type="date" id="exp-date-to">
+                        <button class="btn secondary xs" onclick="app.setExportRange('end')" title="Current Day">End</button>
+                    </div>
                 </div>
             </div>
             <div class="input-group">

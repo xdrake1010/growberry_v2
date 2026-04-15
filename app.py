@@ -114,8 +114,13 @@ class ApplicationSystem:
             temp = self.sensor_data.get("temperature")
             hum = self.sensor_data.get("humidity")
             harvest = self.active_cosecha
+            
+            # Fetch start date if available
+            start_date = None
+            if harvest in self.config_data.get("plants", {}):
+                start_date = self.config_data["plants"][harvest].get("start_date")
         
-        metadata = {"temp": temp, "hum": hum, "harvest": harvest}
+        metadata = {"temp": temp, "hum": hum, "harvest": harvest, "start_date": start_date}
         
         # Implement retries for hardware resilience
         success = False

@@ -127,22 +127,22 @@ class CameraController:
         return None
 
     def _draw_metadata_overlay(self, frame, metadata):
-        """Draws a professional semi-transparent legend at the bottom of the frame."""
+        """Draws a professional gray semi-transparent legend at the bottom of the frame."""
         try:
             h, w = frame.shape[:2]
             overlay = frame.copy()
             
-            # Bottom bar setup
+            # Bottom bar setup - Gray semi-transparent
             bar_height = int(h * 0.08)
-            cv2.rectangle(overlay, (0, h - bar_height), (w, h), (0, 0, 0), -1)
+            cv2.rectangle(overlay, (0, h - bar_height), (w, h), (40, 44, 52), -1) # Dark gray bar
             
-            # Blend the black bar for semi-transparency
-            alpha = 0.5
+            # Blend the bar for semi-transparency
+            alpha = 0.6
             frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
             
             # Text properties
             font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = h / 1000.0 * 0.7
+            font_scale = h / 1000.0 * 0.75
             font_color = (255, 255, 255)
             thickness = 1
             
@@ -152,8 +152,18 @@ class CameraController:
             hum = f"{metadata.get('hum', '--')}%"
             time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
             
-            # Draw Left: Harvest Name
-            cv2.putText(frame, f"GROWBERRY | {harvest_name}", (20, h - int(bar_height/2) + 5), 
+            # Calculate Day X
+            start_date_str = metadata.get("start_date")
+            day_text = ""
+            if start_date_str:
+                try:
+                    start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
+                    diff_days = (datetime.now() - start_dt).days + 1
+                    day_text = f" | DAY {max(1, diff_days)}"
+                except: pass
+
+            # Draw Left: Branding + Harvest + Day
+            cv2.putText(frame, f"GROWBERRY | {harvest_name}{day_text}", (20, h - int(bar_height/2) + 5), 
                         font, font_scale, font_color, thickness, cv2.LINE_AA)
             
             # Draw Right: Stats

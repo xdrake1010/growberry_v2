@@ -30,6 +30,7 @@ class VideoGenerator:
         self.current_job = cosecha_name
         
         try:
+            fps = float(fps)
             cosecha_path = os.path.join(TIMELAPSE_BASE_DIR, cosecha_name)
             if not os.path.exists(cosecha_path):
                 logger.error(f"Catalog for {cosecha_name} not found.")
@@ -70,11 +71,11 @@ class VideoGenerator:
             output_filename = f"{cosecha_name}{range_suffix}_{datetime.now().strftime('%Y%m%d_%H%M')}.mp4"
             output_path = os.path.join(EXPORTS_DIR, output_filename)
 
-            # FFmpeg Command
+            # FFmpeg Command - Optimized for Pi Zero
             cmd = [
                 'ffmpeg', '-y', '-f', 'concat', '-safe', '0', 
                 '-i', manifest_path, 
-                '-vcodec', 'libx264', '-pix_fmt', 'yuv420p', 
+                '-vcodec', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', 
                 '-r', str(fps), output_path
             ]
             
