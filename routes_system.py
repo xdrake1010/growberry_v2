@@ -12,11 +12,11 @@ logger = logging.getLogger("Growberry.System")
 system_bp = Blueprint('system', __name__)
 
 
-def _run(cmd, timeout=12):
+def _run(cmd, timeout=12, cwd=None):
     """Run a shell command, return (stdout, stderr, returncode)."""
     try:
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+            cmd, shell=True, capture_output=True, text=True, timeout=timeout, cwd=cwd
         )
         return result.stdout.strip(), result.stderr.strip(), result.returncode
     except subprocess.TimeoutExpired:
@@ -203,9 +203,10 @@ def ap_stop():
 @system_bp.route('/update/version', methods=['GET'])
 def get_version():
     """Returns the current git branch and commit hash."""
-    branch_out, _, _ = _run("git rev-parse --abbrev-ref HEAD")
-    commit_out, _, _ = _run("git rev-parse --short HEAD")
-    msg_out, _, _ = _run("git log -1 --pretty=%B")
+    repo_dir = "/home/xdrake/growberry_v2"
+    branch_out, _, _ = _run("git rev-parse --abbrev-ref HEAD", cwd=repo_dir)
+    commit_out, _, _ = _run("git rev-parse --short HEAD", cwd=repo_dir)
+    msg_out, _, _ = _run("git log -1 --pretty=%B", cwd=repo_dir)
     
     return jsonify({
         "branch": branch_out or "unknown",
@@ -218,14 +219,15 @@ def update_system():
     """Pulls latest changes and schedules a service restart."""
     data = request.get_json() or {}
     branch = data.get("branch", "master").strip()
+    repo_dir = "/home/xdrake/growberry_v2"
     
     # 1. Fetch
-    out, err, rc = _run("git fetch origin")
+    out, err, rc = _run("git fetch origin", cwd=repo_dir)
     if rc != 0:
         return jsonify({"status": "error", "message": f"Fetch failed: {err}"}), 500
         
     # 2. Reset hard to the new origin/branch
-    out2, err2, rc2 = _run(f"git reset --hard origin/{branch}")
+    out2, err2, rc2 = _run(f"git reset --hard origin/{branch}", cwd=repo_dir)
     if rc2 != 0:
         return jsonify({"status": "error", "message": f"Reset failed: {err2}"}), 500
         
