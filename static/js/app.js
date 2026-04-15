@@ -1159,6 +1159,172 @@ const app = {
                 this.fetchStats();
             } else { throw new Error(data.message); }
         } catch(e) { this.showToast(`Error: ${e.message}`, true); }
+    },
+
+    // ──────────────────────────────────────────────────────────
+    // Settings Sub-Tabs
+    // ──────────────────────────────────────────────────────────
+
+    switchSettingsTab(name) {
+        document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.stab === name);
+        });
+        document.querySelectorAll('.settings-panel').forEach(panel => {
+            panel.classList.toggle('active', panel.id === `stab-${name}`);
+        });
+        if (name === 'network') {
+            this.loadWifiStatus();
+        }
+    },
+
+    // ──────────────────────────────────────────────────────────
+    // WiFi Management
+    // ──────────────────────────────────────────────────────────
+
+    _pendingWifiSsid: null,
+
+    async loadWifiStatus() {
+        const ssidEl = document.getElementById('wifi-status-ssid');
+        const ipEl = document.getElementById('wifi-status-ip');
+        const iconEl = document.getElementById('wifi-status-icon');
+        const signalEl = document.getElementById('wifi-signal-bar');
+        if (ssidEl) ssidEl.textContent = 'Checking...';
+        try {
+            const res = await fetch('/api/system/wifi/status');
+            const d = await res.json();
+            if (d.connected) {
+                if (ssidEl) ssidEl.textContent = d.ssid || 'Connected';
+                if (ipEl) ipEl.textContent = d.ip || '';
+                if (iconEl) iconEl.className = 'wifi-status-icon connected';
+                if (signalEl) signalEl.innerHTML = this._signalBars(d.signal);
+            } else {
+                if (ssidEl) ssidEl.textContent = 'Not Connected';
+                if (ipEl) ipEl.textContent = '';
+                if (iconEl) iconEl.className = 'wifi-status-icon disconnected';
+                if (signalEl) signalEl.innerHTML = '';
+            }
+        } catch(e) {
+            if (ssidEl) ssidEl.textContent = 'Error loading status';
+        }
+    },
+
+    _signalBars(strength) {
+        // strength 0–100 → 0–4 bars
+        const lvl = strength >= 75 ? 4 : strength >= 50 ? 3 : strength >= 25 ? 2 : strength > 0 ? 1 : 0;
+        const colors = ['#ef4444','#f59e0b','#f59e0b','#10b981','#10b981'];
+        let html = '';
+        for (let i = 1; i <= 4; i++) {
+            html += `<span class="signal-bar ${i <= lvl ? 'active' : ''}" style="${i <= lvl ? `background:${colors[lvl]}` : ''}"></span>`;
+        }
+        return `<span class="signal-bars">${html}</span>`;
+    },
+
+    async scanWifi() {
+        const btn = document.getElementById('wifi-scan-btn');
+        const list = document.getElementById('wifi-networks-list');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Scanning...'; }
+        if (list) list.innerHTML = '<div class="wifi-scan-hint"><i class="fa-solid fa-spinner fa-spin"></i><span>Scanning for networks...</span></div>';
+
+        try {
+            const res = await fetch('/api/system/wifi/scan');
+            const networks = await res.json();
+
+            if (!Array.isArray(networks) || networks.length === 0) {
+                list.innerHTML = '<div class="wifi-scan-hint"><i class="fa-solid fa-exclamation-triangle"></i><span>No networks found</span></div>';
+                return;
+            }
+
+            list.innerHTML = '';
+            networks.forEach(net => {
+                const item = document.createElement('div');
+                item.className = `wifi-network-item${net.in_use ? ' in-use' : ''}`;
+                item.innerHTML = `
+                    <div class="wifi-net-info">
+                        <div class="wifi-net-name">
+                            ${net.in_use ? '<i class="fa-solid fa-circle-check" style="color:var(--accent-primary);font-size:12px"></i> ' : ''}
+                            ${net.ssid}
+                        </div>
+                        <div class="wifi-net-meta">
+                            ${this._signalBars(net.signal)}
+                            <span class="wifi-sec-badge">${net.security !== 'Open' ? '🔒' : '🔓'} ${net.security}</span>
+                        </div>
+                    </div>
+                    <button class="btn ${net.in_use ? 'secondary' : 'primary'} sm" 
+                        onclick="app.openWifiModal('${net.ssid.replace(/'/g,"\\'")}', ${net.security === 'Open'})">
+                        ${net.in_use ? 'Connected' : 'Connect'}
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        } catch(e) {
+            list.innerHTML = '<div class="wifi-scan-hint"><i class="fa-solid fa-xmark"></i><span>Scan failed</span></div>';
+            this.showToast('WiFi scan failed', true);
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Scan'; }
+        }
+    },
+
+    openWifiModal(ssid, isOpen = false) {
+        this._pendingWifiSsid = ssid;
+        document.getElementById('wifi-modal-ssid-badge').textContent = ssid;
+        const pwGroup = document.getElementById('wifi-password-group');
+        const pwInput = document.getElementById('wifi-password-input');
+        pwInput.value = '';
+        if (isOpen) {
+            pwGroup.style.display = 'none';
+        } else {
+            pwGroup.style.display = '';
+        }
+        document.getElementById('wifi-connect-modal').classList.remove('hidden');
+        if (!isOpen) setTimeout(() => pwInput.focus(), 100);
+    },
+
+    closeWifiModal() {
+        document.getElementById('wifi-connect-modal').classList.add('hidden');
+        this._pendingWifiSsid = null;
+    },
+
+    toggleWifiPasswordVisibility() {
+        const input = document.getElementById('wifi-password-input');
+        const icon = document.getElementById('wifi-pw-eye');
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fa-solid fa-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'fa-solid fa-eye';
+        }
+    },
+
+    async connectToWifi() {
+        const ssid = this._pendingWifiSsid;
+        const password = document.getElementById('wifi-password-input').value;
+        const btn = document.getElementById('wifi-connect-btn');
+
+        if (!ssid) return;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting...';
+
+        try {
+            const res = await fetch('/api/system/wifi/connect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ssid, password })
+            });
+            const d = await res.json();
+            if (d.status === 'success') {
+                this.showToast(`Connected to ${ssid}`);
+                this.closeWifiModal();
+                setTimeout(() => this.loadWifiStatus(), 1500);
+            } else {
+                this.showToast(d.message || 'Connection failed', true);
+            }
+        } catch(e) {
+            this.showToast('Connection error', true);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-plug"></i> Connect';
+        }
     }
 };
 

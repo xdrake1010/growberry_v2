@@ -238,71 +238,130 @@
 
                 <!-- Settings & Configs Tab -->
                 <section id="settings" class="tab-content">
-                    <div class="glass-panel">
-                        <h2>Harvest Plan Builder</h2>
-                        <p class="subtitle">Visually manage your cultivation cycles and parameters.</p>
-                        
-                        <div class="config-form">
-                            <div class="input-group">
-                                <label>Load Saved Harvest</label>
-                                <div class="input-with-action">
-                                    <select id="cfg-load-selector" onchange="app.loadSelectedHarvest()">
-                                        <option value="">-- Create New / Select --</option>
-                                    </select>
-                                    <button class="btn danger sm" onclick="app.deleteHarvestPlan()" title="Delete Plan"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                            <hr style="opacity:0.1; margin:10px 0;">
-                            <div class="input-group">
-                                <label>Active Cosecha Name</label>
-                                <input type="text" id="cfg-cosecha-name" placeholder="e.g. Tomato_Batch_1">
-                            </div>
-                            <div class="input-group">
-                                <label>Start Date</label>
-                                <div class="input-with-action">
-                                    <input type="date" id="cfg-start-date">
-                                    <button class="btn secondary sm" onclick="app.setStartDateToday()">Set to Today</button>
-                                </div>
-                            </div>
-                            <div class="input-group">
-                                <label>Sensor Log Frequency (min)</label>
-                                <input type="number" id="cfg-log-interval" min="1" max="60" placeholder="1">
-                                <small style="opacity: 0.6;">How often to save Temp/Hum to history.</small>
-                            </div>
-                            <div class="input-group">
-                                <label>Timelapse Resolution (Photo Quality)</label>
-                                <select id="cfg-timelapse-res">
-                                    <option value="320x240">320x240 (Limp Mode - Fastest)</option>
-                                    <option value="640x480">640x480 (SD - Good Balance)</option>
-                                    <option value="1280x720">1280x720 (HD - Sharp Text)</option>
-                                    <option value="1920x1080">1920x1080 (Full HD - Heavy)</option>
-                                </select>
-                                <small style="opacity: 0.6;">High res may slow down video generation.</small>
-                            </div>
-                            <hr style="opacity:0.1; margin:10px 0;">
-                            <div class="cycles-editor">
-                                <div class="cycles-header">
-                                    <h3>Cultivation Cycles</h3>
-                                    <button class="btn secondary sm" onclick="app.addCycleField()"><i class="fa-solid fa-plus"></i> Add Cycle</button>
-                                </div>
-                                <div id="cycles-list" class="cycles-list">
-                                    <!-- Dynamic cycles will be added here -->
-                                </div>
-                            </div>
+                    <!-- Settings Sub-Tab Pill Bar -->
+                    <div class="settings-tabs">
+                        <button class="settings-tab-btn active" data-stab="harvest" onclick="app.switchSettingsTab('harvest')">
+                            <i class="fa-solid fa-seedling"></i> Harvest Plan
+                        </button>
+                        <button class="settings-tab-btn" data-stab="network" onclick="app.switchSettingsTab('network')">
+                            <i class="fa-solid fa-wifi"></i> Network
+                        </button>
+                        <button class="settings-tab-btn" data-stab="system" onclick="app.switchSettingsTab('system')">
+                            <i class="fa-solid fa-arrow-up-right-dots"></i> System
+                        </button>
+                    </div>
 
-                            <div class="actions">
-                                <button class="btn primary" onclick="app.generateAndSaveConfig()"><i class="fa-solid fa-floppy-disk"></i> Save Harvest Plan</button>
-                                <button class="btn secondary" onclick="app.toggleAdvancedMode()">Advanced JSON Mode</button>
+                    <!-- ── Harvest Plan Panel ── -->
+                    <div class="settings-panel active" id="stab-harvest">
+                        <div class="glass-panel">
+                            <h2>Harvest Plan Builder</h2>
+                            <p class="subtitle">Visually manage your cultivation cycles and parameters.</p>
+                            <div class="config-form">
+                                <div class="input-group">
+                                    <label>Load Saved Harvest</label>
+                                    <div class="input-with-action">
+                                        <select id="cfg-load-selector" onchange="app.loadSelectedHarvest()">
+                                            <option value="">-- Create New / Select --</option>
+                                        </select>
+                                        <button class="btn danger sm" onclick="app.deleteHarvestPlan()" title="Delete Plan"><i class="fa-solid fa-trash"></i></button>
+                                    </div>
+                                </div>
+                                <hr style="opacity:0.1; margin:10px 0;">
+                                <div class="input-group">
+                                    <label>Active Cosecha Name</label>
+                                    <input type="text" id="cfg-cosecha-name" placeholder="e.g. Tomato_Batch_1">
+                                </div>
+                                <div class="input-group">
+                                    <label>Start Date</label>
+                                    <div class="input-with-action">
+                                        <input type="date" id="cfg-start-date">
+                                        <button class="btn secondary sm" onclick="app.setStartDateToday()">Set to Today</button>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Sensor Log Frequency (min)</label>
+                                    <input type="number" id="cfg-log-interval" min="1" max="60" placeholder="1">
+                                    <small style="opacity: 0.6;">How often to save Temp/Hum to history.</small>
+                                </div>
+                                <div class="input-group">
+                                    <label>Timelapse Resolution (Photo Quality)</label>
+                                    <select id="cfg-timelapse-res">
+                                        <option value="320x240">320x240 (Limp Mode - Fastest)</option>
+                                        <option value="640x480">640x480 (SD - Good Balance)</option>
+                                        <option value="1280x720">1280x720 (HD - Sharp Text)</option>
+                                        <option value="1920x1080">1920x1080 (Full HD - Heavy)</option>
+                                    </select>
+                                    <small style="opacity: 0.6;">High res may slow down video generation.</small>
+                                </div>
+                                <hr style="opacity:0.1; margin:10px 0;">
+                                <div class="cycles-editor">
+                                    <div class="cycles-header">
+                                        <h3>Cultivation Cycles</h3>
+                                        <button class="btn secondary sm" onclick="app.addCycleField()"><i class="fa-solid fa-plus"></i> Add Cycle</button>
+                                    </div>
+                                    <div id="cycles-list" class="cycles-list">
+                                        <!-- Dynamic cycles will be added here -->
+                                    </div>
+                                </div>
+                                <div class="actions">
+                                    <button class="btn primary" onclick="app.generateAndSaveConfig()"><i class="fa-solid fa-floppy-disk"></i> Save Harvest Plan</button>
+                                    <button class="btn secondary" onclick="app.toggleAdvancedMode()">Advanced JSON Mode</button>
+                                </div>
+                            </div>
+                            <div id="advanced-config" class="advanced-mode hidden">
+                                <h3>Advanced JSON Editor</h3>
+                                <textarea id="config-editor" class="code-editor" rows="15"></textarea>
+                                <button class="btn primary" onclick="app.saveConfig()">Save Raw JSON</button>
                             </div>
                         </div>
+                    </div>
 
-                        <div id="advanced-config" class="advanced-mode hidden">
-                            <h3>Advanced JSON Editor</h3>
-                            <textarea id="config-editor" class="code-editor" rows="15"></textarea>
-                            <button class="btn primary" onclick="app.saveConfig()">Save Raw JSON</button>
+                    <!-- ── Network Panel ── -->
+                    <div class="settings-panel" id="stab-network">
+                        <div class="glass-panel">
+                            <h2><i class="fa-solid fa-wifi" style="color:var(--accent-primary)"></i> Network</h2>
+                            <p class="subtitle">Manage WiFi connections for your Growberry device.</p>
+
+                            <!-- Current connection card -->
+                            <div class="wifi-status-card" id="wifi-status-card">
+                                <div class="wifi-status-icon" id="wifi-status-icon">
+                                    <i class="fa-solid fa-wifi"></i>
+                                </div>
+                                <div class="wifi-status-info">
+                                    <div class="wifi-status-ssid" id="wifi-status-ssid">Checking...</div>
+                                    <div class="wifi-status-meta">
+                                        <span id="wifi-status-ip">--</span>
+                                        <span class="wifi-signal-bar" id="wifi-signal-bar"></span>
+                                    </div>
+                                </div>
+                                <button class="btn secondary sm" onclick="app.scanWifi()" id="wifi-scan-btn">
+                                    <i class="fa-solid fa-rotate"></i> Scan
+                                </button>
+                            </div>
+
+                            <!-- Networks list -->
+                            <div class="wifi-networks-list" id="wifi-networks-list">
+                                <div class="wifi-scan-hint">
+                                    <i class="fa-solid fa-satellite-dish"></i>
+                                    <span>Press Scan to find nearby networks</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ── System Panel ── -->
+                    <div class="settings-panel" id="stab-system">
+                        <div class="glass-panel">
+                            <h2><i class="fa-solid fa-arrow-up-right-dots" style="color:var(--accent-primary)"></i> System &amp; Updates</h2>
+                            <p class="subtitle">Update Growberry firmware from GitHub. <em>Coming in Phase 4.</em></p>
+                            <div class="empty-state">
+                                <i class="fa-solid fa-code-branch"></i>
+                                <p>OTA updates will be available in the next update.</p>
+                            </div>
                         </div>
                     </div>
                 </section>
+
                 
                 <!-- Timelapse Tab -->
                 <section id="timelapse" class="tab-content">
@@ -433,6 +492,28 @@
     <!-- Notification Toast -->
     <div id="toast" class="toast">Action applied successfully</div>
 
+    <!-- WiFi Connect Modal -->
+    <div id="wifi-connect-modal" class="modal hidden">
+        <div class="modal-content glass-panel">
+            <h3><i class="fa-solid fa-wifi"></i> Connect to Network</h3>
+            <div class="wifi-modal-ssid-badge" id="wifi-modal-ssid-badge">Network Name</div>
+            <div class="input-group" id="wifi-password-group">
+                <label>Password</label>
+                <div class="input-with-action">
+                    <input type="password" id="wifi-password-input" placeholder="Enter WiFi password..." autocomplete="new-password">
+                    <button class="btn secondary sm" onclick="app.toggleWifiPasswordVisibility()"><i class="fa-solid fa-eye" id="wifi-pw-eye"></i></button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn secondary" onclick="app.closeWifiModal()">Cancel</button>
+                <button class="btn primary" onclick="app.connectToWifi()" id="wifi-connect-btn">
+                    <i class="fa-solid fa-plug"></i> Connect
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="/js/app.js"></script>
 </body>
 </html>
+

@@ -7,6 +7,7 @@ import RPi.GPIO as GPIO
 from flask import Flask, Response, jsonify
 from flask_cors import CORS
 from routes import api, init_routes
+from routes_system import system_bp
 from hardware_controllers import LEDController, VentilationController, TankController, IrrigationController
 from schedule_controller import ScheduleManager
 from camera_controller import CameraController
@@ -221,6 +222,7 @@ class ApplicationSystem:
 system = ApplicationSystem()
 init_routes(system)
 app.register_blueprint(api, url_prefix='/api')
+app.register_blueprint(system_bp, url_prefix='/api/system')
 
 @app.route('/')
 def index():
