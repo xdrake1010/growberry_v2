@@ -226,12 +226,20 @@ def update_system():
     if rc != 0:
         return jsonify({"status": "error", "message": f"Fetch failed: {err}"}), 500
         
-    # 2. Reset hard to the new origin/branch
+    # 2. Backup user data (db + json configs)
+    _run("cp plants_config.json plants_config.json.bak", cwd=repo_dir)
+    _run("cp growberry.db growberry.db.bak", cwd=repo_dir)
+        
+    # 3. Reset hard to the new origin/branch
     out2, err2, rc2 = _run(f"git reset --hard origin/{branch}", cwd=repo_dir)
     if rc2 != 0:
         return jsonify({"status": "error", "message": f"Reset failed: {err2}"}), 500
         
-    # 3. Schedule a restart in 2 seconds so this HTTP request has time to return
+    # 4. Restore user data (since git reset will delete them if they become untracked)
+    _run("mv plants_config.json.bak plants_config.json", cwd=repo_dir)
+    _run("mv growberry.db.bak growberry.db", cwd=repo_dir)
+        
+    # 5. Schedule a restart in 2 seconds so this HTTP request has time to return
     # We use nohup to detach it completely.
     try:
         subprocess.Popen(
