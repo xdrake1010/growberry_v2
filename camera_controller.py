@@ -160,21 +160,37 @@ class CameraController:
             brand_text = f"GROWBERRY | {harvest_name}{day_text}"
             stats_str = f"{temp} | {hum} | {time_str}"
             
-            # 5. Draw Text with PIL (Perfectly anti-aliased)
-            # Vertical alignment: centering text in the bar
-            text_y = h - (bar_height // 2) - (font_size // 2) - 2
-            
-            # Draw Branding (Left)
-            draw.text((20, text_y), brand_text, font=font, fill=(255, 255, 255, 255))
-            
-            # Draw Stats (Right)
-            # Use getbbox to find width in newer PIL, or textsize in older
-            try:
-                tw = draw.textbbox((0, 0), stats_str, font=font)[2]
-            except:
-                tw = draw.textsize(stats_str, font=font)[0]
+            if w < 600:
+                # 2 lines for Limp Mode (320x240)
+                bar_height = int(h * 0.16)
+                draw.rectangle([0, h - bar_height, w, h], fill=(30, 33, 39, 200)) # Dark charcoal
                 
-            draw.text((w - tw - 20, text_y), stats_str, font=font, fill=(255, 255, 255, 255))
+                text_y_top = h - bar_height + (bar_height // 4) - (font_size // 2)
+                text_y_bot = h - (bar_height // 4) - (font_size // 2)
+                
+                try:
+                    tw_brand = draw.textbbox((0, 0), brand_text, font=font)[2]
+                    tw_stats = draw.textbbox((0, 0), stats_str, font=font)[2]
+                except:
+                    tw_brand = draw.textsize(brand_text, font=font)[0]
+                    tw_stats = draw.textsize(stats_str, font=font)[0]
+                
+                draw.text(((w - tw_brand)//2, text_y_top), brand_text, font=font, fill=(255, 255, 255, 255))
+                draw.text(((w - tw_stats)//2, text_y_bot), stats_str, font=font, fill=(255, 255, 255, 255))
+            else:
+                # Standard 1 line for HD (720p+)
+                bar_height = int(h * 0.08)
+                draw.rectangle([0, h - bar_height, w, h], fill=(30, 33, 39, 200)) # Dark charcoal
+                
+                text_y = h - (bar_height // 2) - (font_size // 2) - 2
+                draw.text((20, text_y), brand_text, font=font, fill=(255, 255, 255, 255))
+                
+                try:
+                    tw = draw.textbbox((0, 0), stats_str, font=font)[2]
+                except:
+                    tw = draw.textsize(stats_str, font=font)[0]
+                    
+                draw.text((w - tw - 20, text_y), stats_str, font=font, fill=(255, 255, 255, 255))
             
             # 6. Convert back to OpenCV BGR
             return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
