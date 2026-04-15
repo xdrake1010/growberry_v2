@@ -98,6 +98,9 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
+    background: var(--bg-primary);
+    position: relative;
+    z-index: 1;
     padding: 16px 16px 16px 0;
     overflow-y: auto;
 }
@@ -999,7 +1002,7 @@ body {
     gap: 10px;
     font-size: 14px;
     font-weight: 700;
-    color: #fff;
+    color: var(--text-main);
 }
 
 .status-item i {
@@ -1367,7 +1370,7 @@ select:focus {
 
 .settings-tab-btn.active {
     background: var(--accent-primary);
-    color: #000;
+    color: #ffffff;
     box-shadow: 0 2px 12px rgba(16, 185, 129, 0.35);
 }
 
@@ -1552,8 +1555,9 @@ select:focus {
    Light Mode Theme Overrides
 ═══════════════════════════════════════════════════════════ */
 body.light-mode {
-    --bg-main: #f1f5f9;
-    --bg-panel: rgba(255, 255, 255, 0.9);
+    --bg-primary: #f1f5f9;
+    --bg-secondary: #e2e8f0;
+    --glass-bg: rgba(255, 255, 255, 0.9);
     --glass-border: rgba(0, 0, 0, 0.1);
     --text-main: #0f172a;
     --text-muted: #64748b;
@@ -1564,7 +1568,7 @@ body.light-mode {
 }
 
 body.light-mode .glass-panel {
-    background: var(--bg-panel);
+    background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     box-shadow: 0 4px 20px rgba(0,0,0,0.05);
 }
@@ -1599,6 +1603,11 @@ body.light-mode .code-editor {
     color: var(--text-main);
 }
 
+body.light-mode .config-row input {
+    background: #ffffff;
+    color: var(--text-main);
+}
+
 body.light-mode .wifi-status-card {
     background: rgba(5, 150, 105, 0.1);
     border: 1px solid rgba(5, 150, 105, 0.2);
@@ -1607,8 +1616,14 @@ body.light-mode .wifi-status-card {
 body.light-mode .settings-tabs {
     background: rgba(0,0,0,0.05);
 }
+body.light-mode .settings-tab-btn {
+    color: var(--text-main);
+}
 body.light-mode .settings-tab-btn:hover {
-    background: rgba(0,0,0,0.1);
+    background: rgba(0,0,0,0.05);
+}
+body.light-mode .settings-tab-btn.active {
+    color: #ffffff;
 }
 
 body.light-mode .ap-mode-section {
