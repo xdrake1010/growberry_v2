@@ -386,14 +386,38 @@
                 <button class="btn secondary sm" onclick="app.setExportRange('start')"><i class="fa-solid fa-calendar-check"></i> Set Start</button>
                 <button class="btn secondary sm" onclick="app.setExportRange('end')"><i class="fa-solid fa-calendar-day"></i> Set Today</button>
             </div>
-            <div class="input-group">
-                <label>FPS (Speed)</label>
-                <input type="number" id="exp-fps" value="10" min="1" max="60">
+            <div class="input-row">
+                <div class="input-group">
+                    <label>FPS (Speed)</label>
+                    <input type="number" id="exp-fps" value="10" min="1" max="60">
+                </div>
+                <div class="input-group">
+                    <label>Output Resolution</label>
+                    <select id="exp-resolution">
+                        <option value="480p">480p (Fast, small file)</option>
+                        <option value="720p" selected>720p HD (Recommended)</option>
+                        <option value="1080p">1080p Full HD (Slow on Pi)</option>
+                    </select>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn secondary" onclick="app.closeExportModal()">Cancel</button>
                 <button class="btn primary" onclick="app.runExport()">Start Export</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Export Progress Overlay -->
+    <div id="export-progress-overlay" class="modal hidden">
+        <div class="modal-content glass-panel export-progress-panel">
+            <h3><i class="fa-solid fa-film"></i> Exporting Video...</h3>
+            <div class="export-job-name" id="export-job-name">Processing...</div>
+            <div class="export-progress-bar-wrap">
+                <div class="export-progress-bar" id="export-progress-bar" style="width:0%"></div>
+            </div>
+            <div class="export-progress-pct" id="export-progress-pct">0%</div>
+            <div class="export-progress-status" id="export-progress-status">Initializing...</div>
+            <button class="btn secondary sm" onclick="app.dismissExportProgress()" id="export-dismiss-btn" style="display:none;margin-top:12px">Close</button>
         </div>
     </div>
 

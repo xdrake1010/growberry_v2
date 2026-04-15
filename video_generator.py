@@ -9,103 +9,165 @@ logger = logging.getLogger("Growberry.Video")
 
 EXPORTS_DIR = os.path.join(BASE_DIR, "data", "exports")
 
+# Allowed resolutions for export
+RESOLUTIONS = {
+    "480p":  (854, 480),
+    "720p":  (1280, 720),
+    "1080p": (1920, 1080),
+}
+
 class VideoGenerator:
     def __init__(self):
         if not os.path.exists(EXPORTS_DIR):
             os.makedirs(EXPORTS_DIR, exist_ok=True)
         self.is_exporting = False
         self.current_job = None
+        self.progress = 0          # 0-100
+        self.progress_status = ""  # human-readable status message
 
-    def export_cosecha(self, cosecha_name, fps=10, date_from=None, date_to=None):
-        """Starts an asynchronous export job for a specific harvest, optionally filtered by date."""
+    def export_cosecha(self, cosecha_name, fps=10, date_from=None, date_to=None, resolution="720p"):
+        """Starts an async export job. resolution: '480p', '720p', or '1080p'."""
         if self.is_exporting:
-            return False, "An export is already in progress."
-        
-        thread = threading.Thread(target=self._run_export, args=(cosecha_name, fps, date_from, date_to))
+            return False, "Export already in progress."
+        thread = threading.Thread(
+            target=self._run_export,
+            args=(cosecha_name, fps, date_from, date_to, resolution),
+            daemon=True
+        )
         thread.start()
-        return True, "Export started successfully."
+        return True, "Export started."
 
-    def _run_export(self, cosecha_name, fps, date_from, date_to):
+    def get_export_status(self):
+        return {
+            "is_exporting": self.is_exporting,
+            "current_job": self.current_job,
+            "progress": self.progress,
+            "status": self.progress_status,
+        }
+
+    def _run_export(self, cosecha_name, fps, date_from, date_to, resolution):
         self.is_exporting = True
         self.current_job = cosecha_name
-        
+        self.progress = 0
+        self.progress_status = "Collecting frames..."
+
         try:
             fps = float(fps)
+            res_w, res_h = RESOLUTIONS.get(resolution, (1280, 720))
+
             cosecha_path = os.path.join(TIMELAPSE_BASE_DIR, cosecha_name)
             if not os.path.exists(cosecha_path):
-                logger.error(f"Catalog for {cosecha_name} not found.")
+                logger.error(f"Harvest folder not found: {cosecha_name}")
+                self.progress_status = "Error: harvest folder not found."
                 return
 
-            # Collect all images from folders that match the date range
+            # Collect images within date range
             all_images = []
-            
-            # Get list of date folders and filter them
-            date_folders = sorted([d for d in os.listdir(cosecha_path) if os.path.isdir(os.path.join(cosecha_path, d))])
-            
+            date_folders = sorted([
+                d for d in os.listdir(cosecha_path)
+                if os.path.isdir(os.path.join(cosecha_path, d))
+            ])
             for date_folder in date_folders:
-                # Basic string comparison for dates in YYYY-MM-DD format
                 if date_from and date_folder < date_from:
                     continue
                 if date_to and date_folder > date_to:
                     continue
-                    
                 date_path = os.path.join(cosecha_path, date_folder)
                 for file in sorted(os.listdir(date_path)):
                     if file.lower().endswith(('.jpg', '.jpeg')):
                         all_images.append(os.path.join(date_path, file))
-            
+
             if not all_images:
-                logger.error(f"No images found for {cosecha_name} in the specified range.")
+                logger.error(f"No images for {cosecha_name} in range.")
+                self.progress_status = "Error: no frames found."
                 return
 
-            # Create an ffmpeg manifest file
+            total = len(all_images)
+            logger.info(f"Exporting {total} frames at {fps}fps → {res_w}x{res_h}")
+            self.progress_status = f"Building manifest ({total} frames)..."
+            self.progress = 5
+
+            # Build ffmpeg concat manifest
             manifest_path = os.path.join(EXPORTS_DIR, f"{cosecha_name}_manifest.txt")
+            frame_duration = 1.0 / fps
             with open(manifest_path, 'w') as f:
                 for img in all_images:
-                    # FFmpeg concat demuxer needs escaped paths or just simple ones
                     f.write(f"file '{img}'\n")
-                    f.write(f"duration {1/fps}\n")
+                    f.write(f"duration {frame_duration}\n")
 
-            # Final Output Path
-            range_suffix = f"_{date_from.replace('-','')}_to_{date_to.replace('-','')}" if date_from and date_to else ""
+            range_suffix = (
+                f"_{date_from.replace('-','')}_to_{date_to.replace('-','')}"
+                if date_from and date_to else ""
+            )
             output_filename = f"{cosecha_name}{range_suffix}_{datetime.now().strftime('%Y%m%d_%H%M')}.mp4"
             output_path = os.path.join(EXPORTS_DIR, output_filename)
 
-            # FFmpeg Command - Optimized for Pi Zero and forced to 720p HD via scaling
-            cmd = [
-                'ffmpeg', '-y', '-f', 'concat', '-safe', '0', 
-                '-i', manifest_path, 
-                '-vf', 'scale=1280:-2,format=yuv420p',
-                '-vcodec', 'libx264', '-preset', 'ultrafast', 
-                '-r', str(fps), output_path
-            ]
-            
-            logger.info(f"Running FFmpeg: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                logger.info(f"Export successful: {output_path}")
-            else:
-                logger.error(f"FFmpeg error: {result.stderr}")
+            self.progress = 10
+            self.progress_status = f"Encoding {total} frames to {res_w}x{res_h} {resolution}..."
 
-            # Cleanup manifest
+            # Scale preserving aspect ratio + letterbox pad + faststart for browser playback
+            vf = (
+                f"scale={res_w}:{res_h}:force_original_aspect_ratio=decrease,"
+                f"pad={res_w}:{res_h}:(ow-iw)/2:(oh-ih)/2:black,"
+                f"format=yuv420p"
+            )
+
+            cmd = [
+                'ffmpeg', '-y',
+                '-f', 'concat', '-safe', '0',
+                '-i', manifest_path,
+                '-vf', vf,
+                '-vcodec', 'libx264', '-preset', 'ultrafast',
+                '-movflags', '+faststart',   # moov atom at front → browser can stream
+                '-r', str(fps),
+                output_path
+            ]
+
+            logger.info(f"FFmpeg: {' '.join(cmd)}")
+
+            # Run ffmpeg and track progress via stderr line count
+            proc = subprocess.Popen(
+                cmd, stderr=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                text=True, bufsize=1
+            )
+            frame_count = 0
+            for line in proc.stderr:
+                if 'frame=' in line:
+                    try:
+                        fc = int(line.split('frame=')[1].split()[0])
+                        frame_count = fc
+                        pct = min(10 + int((fc / total) * 85), 95)
+                        self.progress = pct
+                        self.progress_status = f"Encoding frame {fc}/{total}..."
+                    except Exception:
+                        pass
+
+            proc.wait()
+
             if os.path.exists(manifest_path):
                 os.remove(manifest_path)
 
+            if proc.returncode == 0:
+                size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                logger.info(f"Export OK: {output_path} ({size_mb:.1f} MB)")
+                self.progress = 100
+                self.progress_status = f"Done! {output_filename} ({size_mb:.1f} MB)"
+            else:
+                logger.error("FFmpeg failed.")
+                self.progress_status = "Error: FFmpeg encoding failed."
+
         except Exception as e:
-            logger.error(f"Export failed: {e}")
+            logger.error(f"Export error: {e}")
+            self.progress_status = f"Error: {e}"
         finally:
             self.is_exporting = False
             self.current_job = None
 
     def delete_video(self, filename):
-        """Deletes a generated video file."""
         try:
-            # Security check: ensure the file is within EXPORTS_DIR
             target_path = os.path.abspath(os.path.join(EXPORTS_DIR, filename))
             if not target_path.startswith(os.path.abspath(EXPORTS_DIR)):
                 return False, "Unauthorized path"
-                
             if os.path.exists(target_path):
                 os.remove(target_path)
                 return True, "Video deleted"
@@ -115,10 +177,8 @@ class VideoGenerator:
             return False, str(e)
 
     def list_exports(self):
-        """Lists all generated MP4 files in the exports directory."""
         if not os.path.exists(EXPORTS_DIR):
             return []
-        
         files = []
         for file in sorted(os.listdir(EXPORTS_DIR), reverse=True):
             if file.endswith(".mp4"):

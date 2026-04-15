@@ -643,22 +643,78 @@ const app = {
         const from = document.getElementById('exp-date-from').value;
         const to = document.getElementById('exp-date-to').value;
         const fps = document.getElementById('exp-fps').value;
-        
+        const resolution = document.getElementById('exp-resolution').value;
+
         this.closeExportModal();
-        this.showToast("Starting video generation...");
-        
+
+        // Show progress overlay immediately
+        const overlay = document.getElementById('export-progress-overlay');
+        if (overlay) {
+            overlay.classList.remove('hidden');
+            document.getElementById('export-progress-bar').style.width = '0%';
+            document.getElementById('export-progress-pct').textContent = '0%';
+            document.getElementById('export-progress-status').textContent = 'Starting...';
+            document.getElementById('export-job-name').textContent = `${cosecha} @ ${resolution}`;
+            document.getElementById('export-dismiss-btn').style.display = 'none';
+        }
+
         try {
             const res = await fetch('/api/timelapse/export', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ cosecha, fps, date_from: from, date_to: to })
+                body: JSON.stringify({ cosecha, fps, date_from: from, date_to: to, resolution })
             });
             const data = await res.json();
-            if(data.status === 'success') {
-                this.showToast(data.message);
-                setTimeout(() => this.loadExports(), 5000);
-            } else throw new Error(data.message);
-        } catch(e) { this.showToast(e.message, true); }
+            if (data.status === 'success') {
+                this._pollExportProgress();
+            } else {
+                throw new Error(data.message);
+            }
+        } catch(e) {
+            this.showToast(e.message, true);
+            if (overlay) overlay.classList.add('hidden');
+        }
+    },
+
+    _exportPollTimer: null,
+
+    _pollExportProgress() {
+        if (this._exportPollTimer) clearInterval(this._exportPollTimer);
+        this._exportPollTimer = setInterval(async () => {
+            try {
+                const res = await fetch('/api/timelapse/export/status');
+                const s = await res.json();
+
+                const bar = document.getElementById('export-progress-bar');
+                const pct = document.getElementById('export-progress-pct');
+                const statusEl = document.getElementById('export-progress-status');
+                const dismissBtn = document.getElementById('export-dismiss-btn');
+
+                if (bar) bar.style.width = `${s.progress}%`;
+                if (pct) pct.textContent = `${s.progress}%`;
+                if (statusEl) statusEl.textContent = s.status || 'Processing...';
+
+                if (!s.is_exporting) {
+                    clearInterval(this._exportPollTimer);
+                    this._exportPollTimer = null;
+                    if (dismissBtn) dismissBtn.style.display = 'block';
+                    // Reload exports list
+                    setTimeout(() => this.loadExports(), 500);
+                }
+            } catch(e) {
+                clearInterval(this._exportPollTimer);
+                this._exportPollTimer = null;
+            }
+        }, 1500);
+    },
+
+    dismissExportProgress() {
+        const overlay = document.getElementById('export-progress-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        if (this._exportPollTimer) {
+            clearInterval(this._exportPollTimer);
+            this._exportPollTimer = null;
+        }
     },
 
     async deleteImage(cosecha, date, filename) {
@@ -715,30 +771,37 @@ const app = {
         try {
             const res = await fetch('/api/timelapse/exports');
             const data = await res.json();
-            
-            if(!data || data.length === 0) {
+
+            if (!data || data.length === 0) {
                 container.classList.add('hidden');
                 return;
             }
 
             container.classList.remove('hidden');
             list.innerHTML = '';
-            
+
             data.forEach(video => {
                 const card = document.createElement('div');
                 card.className = 'video-card';
-                
-                // Extract metadata from name if possible (Harvest_Date_Time)
+
                 const nameParts = video.name.split('_');
                 const harvestName = nameParts[0] || 'Unknown';
                 const dateRaw = nameParts[1] || '';
-                const displayDate = dateRaw.length === 8 ? `${dateRaw.slice(0,4)}-${dateRaw.slice(4,6)}-${dateRaw.slice(6,8)}` : video.date;
+                const displayDate = dateRaw.length === 8
+                    ? `${dateRaw.slice(0,4)}-${dateRaw.slice(4,6)}-${dateRaw.slice(6,8)}`
+                    : video.date;
+
+                const streamUrl = `/api/timelapse/stream/${video.name}`;
+                const downloadUrl = `/api/timelapse/download/${video.name}`;
 
                 card.innerHTML = `
                     <div class="card-header">
                         <h4>${harvestName}</h4>
                         <button class="btn-icon danger" onclick="app.deleteVideo('${video.name}')"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
+                    <video class="export-video-player" controls preload="metadata" src="${streamUrl}">
+                        Your browser does not support HTML5 video.
+                    </video>
                     <div class="video-meta">
                         <span><i class="fa-solid fa-calendar"></i> ${displayDate}</span>
                         <span><i class="fa-solid fa-clock"></i> ${video.date.split(' ')[1] || ''}</span>
@@ -746,12 +809,12 @@ const app = {
                         <span><i class="fa-solid fa-file-invoice"></i> ${video.name}</span>
                     </div>
                     <div class="card-actions">
-                        <a href="/api/timelapse/download/${video.name}" class="btn primary sm"><i class="fa-solid fa-download"></i> Download MP4</a>
+                        <a href="${downloadUrl}" class="btn primary sm"><i class="fa-solid fa-download"></i> Download MP4</a>
                     </div>
                 `;
                 list.appendChild(card);
             });
-        } catch(e) { console.error("Failed to load exports", e); }
+        } catch(e) { console.error('Failed to load exports', e); }
     },
 
     openLightbox(url, caption) {

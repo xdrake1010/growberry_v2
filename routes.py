@@ -246,22 +246,37 @@ def get_history():
 
 @api.route('/timelapse/export', methods=['POST'])
 def export_timelapse():
-    cosecha = request.json.get('cosecha', _system.active_cosecha)
-    fps = request.json.get('fps', 10)
-    date_from = request.json.get('date_from')
-    date_to = request.json.get('date_to')
-    
-    success, message = _system.video_generator.export_cosecha(cosecha, fps, date_from, date_to)
+    data = request.json or {}
+    cosecha = data.get('cosecha', _system.active_cosecha)
+    fps = data.get('fps', 10)
+    date_from = data.get('date_from')
+    date_to = data.get('date_to')
+    resolution = data.get('resolution', '720p')
+
+    success, message = _system.video_generator.export_cosecha(
+        cosecha, fps, date_from, date_to, resolution
+    )
     if success:
         return jsonify({"status": "success", "message": message})
     return jsonify({"status": "error", "message": message}), 400
+
+@api.route('/timelapse/export/status', methods=['GET'])
+def export_status():
+    """Returns current export progress for polling."""
+    return jsonify(_system.video_generator.get_export_status())
 
 @api.route('/timelapse/exports', methods=['GET'])
 def list_exports():
     return jsonify(_system.video_generator.list_exports())
 
+@api.route('/timelapse/stream/<filename>', methods=['GET'])
+def stream_video(filename):
+    """Serves video inline so the browser can play it directly."""
+    return send_from_directory(EXPORTS_DIR, filename, as_attachment=False)
+
 @api.route('/timelapse/download/<filename>', methods=['GET'])
 def download_video(filename):
+    """Forces browser to download the file."""
     return send_from_directory(EXPORTS_DIR, filename, as_attachment=True)
 
 @api.route('/harvests/info', methods=['GET'])
