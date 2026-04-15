@@ -169,13 +169,13 @@ class VideoGenerator:
             stats_text = f"{total} frames | {fps:.0f}fps | {export_date}"
 
             # ── FFmpeg filter chain ───────────────────────────────────────────
-            # Scale with letterbox + burn HD overlay at output resolution
+            # Scale with letterbox at output resolution
             scale_pad = (
                 f"scale={res_w}:{res_h}:force_original_aspect_ratio=decrease,"
                 f"pad={res_w}:{res_h}:(ow-iw)/2:(oh-ih)/2:black"
             )
-            overlay = self._build_overlay_filter(res_w, res_h, brand_text, stats_text)
-            vf = f"{scale_pad},{overlay},format=yuv420p"
+            # The images are already overlaid with text metadata by PIL at capture time
+            vf = f"{scale_pad},format=yuv420p"
 
             cmd = [
                 'ffmpeg', '-y',
