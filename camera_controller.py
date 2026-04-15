@@ -5,6 +5,7 @@ import logging
 import threading
 import numpy as np
 from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
 from config import TIMELAPSE_BASE_DIR
 
 logger = logging.getLogger("Growberry.Camera")
@@ -115,34 +116,38 @@ class CameraController:
         return None
 
     def _draw_metadata_overlay(self, frame, metadata):
-        """Draws a professional gray semi-transparent legend at the bottom of the frame."""
+        """Draws a professional HD legend at the bottom using PIL for high-quality anti-aliased text."""
         try:
             h, w = frame.shape[:2]
-            overlay = frame.copy()
             
-            # Bottom bar setup - Gray semi-transparent
+            # 1. Convert OpenCV BGR to PIL RGB
+            pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(pil_img, "RGBA")
+            
+            # 2. Draw Bottom Bar - Matte Dark Gray
             bar_height = int(h * 0.08)
-            cv2.rectangle(overlay, (0, h - bar_height), (w, h), (40, 44, 52), -1) # Dark gray bar
+            # Use a slightly transparent solid bar for a more premium look
+            draw.rectangle([0, h - bar_height, w, h], fill=(30, 33, 39, 200)) # Dark charcoal
             
-            # Blend the bar for semi-transparency
-            alpha = 0.6
-            frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+            # 3. Text setup - Using OpenSans-Bold for maximum clarity
+            font_path = "/usr/share/fonts/truetype/open-sans/OpenSans-Bold.ttf"
+            if not os.path.exists(font_path):
+                # Fallback to a standard font if OpenSans is missing
+                font_path = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
             
-            # Text properties - Robust for all resolutions
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            # Dynamic scale: base 0.4, but scales up with height
-            font_scale = max(0.4, h / 480.0) 
-            font_color = (255, 255, 255)
-            # Use thickness=2 for much better definition in high-res
-            thickness = 2 
-            
-            # Content
+            # Calculate font size based on height
+            font_size = max(12, int(h / 20))
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+            except:
+                font = ImageFont.load_default()
+
+            # 4. Prepare Content
             harvest_name = metadata.get("harvest", self.cosecha_name).upper()
             temp = f"{metadata.get('temp', '--')}C"
             hum = f"{metadata.get('hum', '--')}%"
             time_str = datetime.now().strftime("%Y-%m-%d %H:%M")
             
-            # Calculate Day X
             start_date_str = metadata.get("start_date")
             day_text = ""
             if start_date_str:
@@ -155,24 +160,27 @@ class CameraController:
             brand_text = f"GROWBERRY | {harvest_name}{day_text}"
             stats_str = f"{temp} | {hum} | {time_str}"
             
-            # Multi-layer drawing for maximum sharpness
-            # 1. Background shadow (black) (offset slightly based on height)
-            shadow_off = max(1, int(h/480))
-            cv2.putText(frame, brand_text, (20 + shadow_off, h - int(bar_height/2) + 5 + shadow_off), 
-                        font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
-            # 2. Primary text (white)
-            cv2.putText(frame, brand_text, (20, h - int(bar_height/2) + 5), 
-                        font, font_scale, font_color, thickness, cv2.LINE_AA)
+            # 5. Draw Text with PIL (Perfectly anti-aliased)
+            # Vertical alignment: centering text in the bar
+            text_y = h - (bar_height // 2) - (font_size // 2) - 2
             
-            # Stats (Right)
-            text_size = cv2.getTextSize(stats_str, font, font_scale, thickness)[0]
-            # Shadow
-            cv2.putText(frame, stats_str, (w - text_size[0] - 20 + shadow_off, h - int(bar_height/2) + 5 + shadow_off), 
-                        font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
-            # Text
-            cv2.putText(frame, stats_str, (w - text_size[0] - 20, h - int(bar_height/2) + 5), 
-                        font, font_scale, font_color, thickness, cv2.LINE_AA)
+            # Draw Branding (Left)
+            draw.text((20, text_y), brand_text, font=font, fill=(255, 255, 255, 255))
             
+            # Draw Stats (Right)
+            # Use getbbox to find width in newer PIL, or textsize in older
+            try:
+                tw = draw.textbbox((0, 0), stats_str, font=font)[2]
+            except:
+                tw = draw.textsize(stats_str, font=font)[0]
+                
+            draw.text((w - tw - 20, text_y), stats_str, font=font, fill=(255, 255, 255, 255))
+            
+            # 6. Convert back to OpenCV BGR
+            return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+            
+        except Exception as e:
+            logger.error(f"Error drawing HD overlay: {e}")
             return frame
         except Exception as e:
             logger.error(f"Error drawing overlay: {e}")

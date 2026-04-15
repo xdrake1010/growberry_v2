@@ -997,6 +997,21 @@ body {
     border-radius: 20px;
 }
 
+/* Manual Overrides Active States */
+.toggle-btns .btn.active.on {
+    background: var(--accent-primary) !important;
+    color: #000 !important;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    border-color: rgba(255,255,255,0.2);
+}
+
+.toggle-btns .btn.active.off {
+    background: #ef4444 !important; /* Rose Red */
+    color: #fff !important;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    border-color: rgba(255,255,255,0.2);
+}
+
 /* --- Generated Videos Grid --- */
 .exports-grid {
     display: grid;
