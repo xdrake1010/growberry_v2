@@ -32,41 +32,33 @@ def _run(cmd, timeout=12):
 def wifi_status():
     """Returns current WiFi connection info."""
     try:
-        # Get active connection
-        out, _, rc = _run("nmcli -t -f NAME,TYPE,DEVICE,STATE con show --active")
-        wifi_con = None
-        for line in out.splitlines():
-            parts = line.split(":")
-            if len(parts) >= 4 and "wireless" in parts[1]:
-                wifi_con = parts[0]
-                break
-
-        # Get interface details
-        out2, _, _ = _run("nmcli -t -f GENERAL.CONNECTION,IP4.ADDRESS,WIFI-PROPERTIES.STRENGTH dev show wlan0")
+        # Get SSID and IP from wlan0 device details
+        out, _, _ = _run("nmcli -t -f GENERAL.CONNECTION,IP4.ADDRESS dev show wlan0")
         ssid = None
         ip = None
-        signal = 0
-        for line in out2.splitlines():
+        for line in out.splitlines():
             if line.startswith("GENERAL.CONNECTION:"):
-                ssid = line.split(":", 1)[1].strip() or wifi_con
+                val = line.split(":", 1)[1].strip()
+                if val and val != "--":
+                    ssid = val
             elif line.startswith("IP4.ADDRESS"):
-                ip = line.split(":", 1)[1].strip().split("/")[0]
-            elif line.startswith("WIFI-PROPERTIES.STRENGTH:"):
+                val = line.split(":", 1)[1].strip()
+                if val:
+                    ip = val.split("/")[0]
+
+        # Get signal strength from scan cache (fast, no rescan)
+        signal = 0
+        out2, _, _ = _run("nmcli -t -f SSID,SIGNAL dev wifi list ifname wlan0")
+        for line in out2.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 2 and parts[0].strip() == ssid:
                 try:
-                    signal = int(line.split(":", 1)[1].strip())
+                    signal = int(parts[1].strip())
                 except ValueError:
-                    signal = 0
+                    pass
+                break
 
-        # Fallback: get SSID from iwconfig if nmcli doesn't have it
-        if not ssid or ssid == "--":
-            out3, _, _ = _run("iwconfig wlan0 2>/dev/null | grep 'ESSID'")
-            if "ESSID:" in out3:
-                try:
-                    ssid = out3.split('ESSID:"')[1].split('"')[0]
-                except Exception:
-                    ssid = None
-
-        connected = bool(ssid and ssid != "--" and ip)
+        connected = bool(ssid and ip)
         return jsonify({
             "connected": connected,
             "ssid": ssid if connected else None,
@@ -76,6 +68,8 @@ def wifi_status():
     except Exception as e:
         logger.error(f"wifi_status error: {e}")
         return jsonify({"connected": False, "ssid": None, "ip": None, "signal": 0, "error": str(e)})
+
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
