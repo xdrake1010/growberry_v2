@@ -39,7 +39,12 @@
                 <div class="status-indicator">
                     <div class="dot active"></div> System Online
                 </div>
-                <div class="current-date" id="current-time">--:--:--</div>
+                <div style="display: flex; gap: 16px; align-items: center;">
+                    <button id="theme-toggle" class="btn sm" onclick="app.toggleTheme()" style="background:transparent; border:none; color:var(--text-main); cursor:pointer;">
+                        <i class="fa-solid fa-sun" id="theme-icon"></i>
+                    </button>
+                    <div class="current-date" id="current-time">--:--:--</div>
+                </div>
             </header>
 
             <div class="view-container">
@@ -384,9 +389,17 @@
                                     </div>
                                     <div style="font-size:12px; color:var(--text-muted); font-style:italic;" id="sys-msg">Loading commit message...</div>
                                 </div>
-                                <div class="config-actions" style="margin-left:auto;">
-                                    <button class="btn secondary" onclick="app.loadSystemVersion()"><i class="fa-solid fa-rotate"></i> Check</button>
-                                    <button class="btn primary" onclick="app.updateSystem()" id="sys-update-btn"><i class="fa-solid fa-download"></i> Update Now</button>
+                                <div class="config-actions" style="margin-left:auto; display:flex; flex-direction:column; gap:8px;">
+                                    <div style="display:flex; justify-content:flex-end; gap:8px;">
+                                        <button class="btn secondary sm" onclick="app.loadSystemVersion()"><i class="fa-solid fa-rotate"></i> Check</button>
+                                    </div>
+                                    <div style="display:flex; gap:8px; align-items:center;">
+                                        <select id="sys-branch-select" class="sm" style="padding:4px 8px; border-radius:6px; background:rgba(255,255,255,0.05); color:var(--text-main); border:1px solid var(--glass-border);">
+                                            <option value="master">master</option>
+                                            <option value="dev">dev</option>
+                                        </select>
+                                        <button class="btn primary" onclick="app.updateSystem()" id="sys-update-btn"><i class="fa-solid fa-download"></i> Update to Branch</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -8,6 +8,7 @@ const app = {
         try { this.initCharts(); } catch(e) { console.error("Charts failed", e); }
         
         try {
+            this.initTheme();
             this.galleryState = { cosecha: null, date: null, rawData: [] };
             this.fetchStats();
             this.loadConfigToForm(); // Pre-load config for quick settings access
@@ -45,6 +46,30 @@ const app = {
                 });
             });
         }
+    },
+
+    initTheme() {
+        const isLight = localStorage.getItem('growberry_theme') === 'light';
+        if (isLight) {
+            document.body.classList.add('light-mode');
+            const icon = document.getElementById('theme-icon');
+            if (icon) icon.className = 'fa-solid fa-moon';
+        }
+    },
+
+    toggleTheme() {
+        const body = document.body;
+        const icon = document.getElementById('theme-icon');
+        body.classList.toggle('light-mode');
+        
+        if (body.classList.contains('light-mode')) {
+            localStorage.setItem('growberry_theme', 'light');
+            if (icon) icon.className = 'fa-solid fa-moon';
+        } else {
+            localStorage.setItem('growberry_theme', 'dark');
+            if (icon) icon.className = 'fa-solid fa-sun';
+        }
+        this.updateCharts(); // Force redraw charts for new colors
     },
 
     cacheDOM() {
@@ -1424,18 +1449,21 @@ const app = {
 
     async updateSystem() {
         const btn = document.getElementById('sys-update-btn');
-        if (!confirm("Update Growberry to the latest version? The system will restart during this process.")) {
+        const branchSelect = document.getElementById('sys-branch-select');
+        const selectedBranch = branchSelect ? branchSelect.value : 'master';
+        
+        if (!confirm(`Update Growberry to branch '${selectedBranch}'? The system will restart during this process.`)) {
             return;
         }
         
         btn.disabled = true;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading Update...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading...';
         
         try {
             const res = await fetch('/api/system/update/pull', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ branch: 'master' })
+                body: JSON.stringify({ branch: selectedBranch })
             });
             const data = await res.json();
             

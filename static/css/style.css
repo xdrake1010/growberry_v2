@@ -1547,3 +1547,80 @@ select:focus {
 .ap-cred span {
     color: var(--text-muted);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Light Mode Theme Overrides
+═══════════════════════════════════════════════════════════ */
+body.light-mode {
+    --bg-main: #f1f5f9;
+    --bg-panel: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --accent-primary: #059669;
+    --accent-hover: #047857;
+    --danger: #dc2626;
+    --warning: #d97706;
+}
+
+body.light-mode .glass-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+body.light-mode .top-header,
+body.light-mode .sidebar {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.light-mode .nav-links li:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.light-mode .nav-links li.active {
+    background: rgba(5, 150, 105, 0.1);
+    color: var(--accent-primary);
+}
+
+body.light-mode .btn.secondary {
+    background: rgba(0,0,0,0.05);
+    color: var(--text-main);
+}
+body.light-mode .btn.secondary:hover {
+    background: rgba(0,0,0,0.1);
+}
+
+body.light-mode .input-group input, 
+body.light-mode .input-group select,
+body.light-mode .code-editor {
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.2);
+    color: var(--text-main);
+}
+
+body.light-mode .wifi-status-card {
+    background: rgba(5, 150, 105, 0.1);
+    border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+body.light-mode .settings-tabs {
+    background: rgba(0,0,0,0.05);
+}
+body.light-mode .settings-tab-btn:hover {
+    background: rgba(0,0,0,0.1);
+}
+
+body.light-mode .ap-mode-section {
+    background: rgba(255,255,255,0.5);
+    border-color: rgba(0,0,0,0.1);
+}
+
+body.light-mode .signal-bar {
+    background: rgba(0,0,0,0.2);
+}
+
+body.light-mode .config-row {
+    background: rgba(255,255,255,0.7) !important;
+    border: 1px solid var(--glass-border);
+}
