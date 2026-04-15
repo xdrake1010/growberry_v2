@@ -101,7 +101,7 @@ class VideoGenerator:
             cosecha_path = os.path.join(TIMELAPSE_BASE_DIR, cosecha_name)
             if not os.path.exists(cosecha_path):
                 logger.error(f"Harvest folder not found: {cosecha_name}")
-                self.progress_status = "Error: harvest folder not found."
+                self.progress_status = "Error: No frames have been captured yet for this harvest."
                 return
 
             # Collect images within date range
@@ -122,7 +122,7 @@ class VideoGenerator:
 
             if not all_images:
                 logger.error(f"No images for {cosecha_name} in range.")
-                self.progress_status = "Error: no frames found."
+                self.progress_status = "Error: No frames found. Has the camera captured any yet?"
                 return
 
             total = len(all_images)
