@@ -42,16 +42,24 @@ class CameraController:
                 cap.release()
         return available
 
-    def _get_camera(self):
+    def _get_camera(self, width=320, height=240):
         """Attempts to open the camera with preferred backends and settings.
         Includes a retry loop to handle transient USB disconnects (EMI).
         Expects self.lock to be held by caller.
         """
-        # If already opened by another thread, return it
+        # If already opened at the REQUESTED resolution, return it
         if self.shared_camera is not None:
              try:
                  if self.shared_camera.isOpened():
-                     return self.shared_camera
+                     current_w = self.shared_camera.get(cv2.CAP_PROP_FRAME_WIDTH)
+                     current_h = self.shared_camera.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                     if int(current_w) == width and int(current_h) == height:
+                         return self.shared_camera
+                     else:
+                         # Resolution mismatch, need to re-open
+                         logger.info(f"[RES-CHANGE] Switching from {current_w}x{current_h} to {width}x{height}")
+                         self.shared_camera.release()
+                         self.shared_camera = None
              except:
                  self.shared_camera = None
         
@@ -62,65 +70,45 @@ class CameraController:
             logger.info(f"[IDLE] Camera is in cooldown ({int(cooldown_period - time_since_fail)}s remaining).")
             return None
 
-        max_attempts = 2 # Reduced from 5 to avoid blocking Flask
+        max_attempts = 2 
         for attempt in range(max_attempts):
-            # Only try index 0 and 1 on Pi Zero to save time
             indices_to_try = [0, 1] if self.camera_index not in [0, 1] else [self.camera_index, 1 - self.camera_index]
             
             for idx in indices_to_try:
-                # Try multiple backends: V4L2 first, then default
                 backends = [cv2.CAP_V4L2, cv2.CAP_ANY]
                 for backend in backends:
                     try:
-                        logger.info(f"[PROBE] Trying index {idx} with backend {backend}")
+                        logger.info(f"[PROBE] Trying index {idx} with resolution {width}x{height}")
                         cap = cv2.VideoCapture(idx, backend)
                         if cap.isOpened():
-                            # CRITICAL: Give camera a moment to initialize hardware buffers
-                            # On Pi Zero, anything less than 1.5s can cause 'Protocol Error' with Redragon
                             time.sleep(1.5) 
                             
-                            # LIMP MODE: Force 320x240 to save USB bandwidth on Pi Zero
                             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-                            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-                            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+                            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
                             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                             
-                            # Warm-up: Discard enough frames for AGC/AEC to fully converge.
-                            # The Redragon/Sonix sensor needs ~25 frames (~1s at 30fps) to
-                            # stabilize auto-exposure after opening. Fewer frames = overexposed captures.
+                            # Warm-up: Stabilization
                             for _ in range(25):
                                 cap.grab()
                             
-                            # Test if we can actually read a valid frame
                             success, frame = cap.read()
                             if success and frame is not None:
-                                logger.info(f"[SUCCESS] Camera {idx} is UP at 320x240.")
+                                actual_w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                                actual_h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                                logger.info(f"[SUCCESS] Camera {idx} is UP at {actual_w}x{actual_h}.")
                                 self.camera_index = idx 
                                 self.shared_camera = cap
                                 return cap
                             else:
-                                # Falling back to raw format if MJPEG failed
-                                logger.warning(f"[RETRY] MJPEG failed on index {idx}, trying YUYV...")
-                                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
-                                success, frame = cap.read()
-                                if success:
-                                    logger.info(f"[SUCCESS] Camera {idx} is UP (YUYV fallback).")
-                                    self.shared_camera = cap
-                                    return cap
-                                
-                                logger.warning(f"[FAIL] Camera {idx} opened but failed to read frame.")
                                 cap.release()
-                        else:
-                            # Faster fail if device won't even open
-                            pass 
+                        else: pass 
                     except Exception as e:
                         logger.warning(f"Error opening camera {idx}: {e}")
             
-            # USB Recovery Sleep: Only if we haven't given up yet
             if attempt < max_attempts - 1:
                 time.sleep(2.0)
         
-        # Mark failure time to trigger cooldown
         self.last_fail_time = time.time()
         return None
                 
@@ -140,13 +128,13 @@ class CameraController:
             alpha = 0.6
             frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
             
-            # Text properties - Beefed up for better readability at low resolutions
+            # Text properties - Robust for all resolutions
             font = cv2.FONT_HERSHEY_SIMPLEX
-            # Increase base scale for better status on small resolutions
-            font_scale = max(0.4, h / 450.0) 
+            # Dynamic scale: base 0.4, but scales up with height
+            font_scale = max(0.4, h / 480.0) 
             font_color = (255, 255, 255)
-            thickness = 1 # Keeping 1 for now but with shadow it will be much clearer
-            if h > 480: thickness = 2 # Bold for higher res
+            # Use thickness=2 for much better definition in high-res
+            thickness = 2 
             
             # Content
             harvest_name = metadata.get("harvest", self.cosecha_name).upper()
@@ -164,20 +152,24 @@ class CameraController:
                     day_text = f" | DAY {max(1, diff_days)}"
                 except: pass
 
-            # Branding + Harvest + Day details
             brand_text = f"GROWBERRY | {harvest_name}{day_text}"
             stats_str = f"{temp} | {hum} | {time_str}"
             
-            # Draw Shadow for extra clarity (Offset by 1px)
-            cv2.putText(frame, brand_text, (21, h - int(bar_height/2) + 6), 
-                        font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+            # Multi-layer drawing for maximum sharpness
+            # 1. Background shadow (black) (offset slightly based on height)
+            shadow_off = max(1, int(h/480))
+            cv2.putText(frame, brand_text, (20 + shadow_off, h - int(bar_height/2) + 5 + shadow_off), 
+                        font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
+            # 2. Primary text (white)
             cv2.putText(frame, brand_text, (20, h - int(bar_height/2) + 5), 
                         font, font_scale, font_color, thickness, cv2.LINE_AA)
             
-            # Draw Right: Stats
+            # Stats (Right)
             text_size = cv2.getTextSize(stats_str, font, font_scale, thickness)[0]
-            cv2.putText(frame, stats_str, (w - text_size[0] - 19, h - int(bar_height/2) + 6), 
-                        font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+            # Shadow
+            cv2.putText(frame, stats_str, (w - text_size[0] - 20 + shadow_off, h - int(bar_height/2) + 5 + shadow_off), 
+                        font, font_scale, (0, 0, 0), thickness + 1, cv2.LINE_AA)
+            # Text
             cv2.putText(frame, stats_str, (w - text_size[0] - 20, h - int(bar_height/2) + 5), 
                         font, font_scale, font_color, thickness, cv2.LINE_AA)
             
@@ -203,13 +195,14 @@ class CameraController:
         release_needed = False
         
         try:
+            # Parse requested resolution from metadata or use default 240p for now
+            res_str = metadata.get("resolution", "320x240")
+            w, h = map(int, res_str.split('x'))
+            
             with self.lock:
-                if self.shared_camera is not None and self.shared_camera.isOpened():
-                    camera = self.shared_camera
-                    release_needed = False # Don't release if it's shared/streaming
-                else:
-                    camera = self._get_camera()
-                    release_needed = True # Release if we opened it just for this
+                # If shared is already at the correct res, keep it
+                camera = self._get_camera(width=w, height=h)
+                release_needed = False # We let it persist unless res change is needed next time
             
             if camera is None:
                 logger.error("Could not find or open any camera for timelapse")

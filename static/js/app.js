@@ -599,15 +599,18 @@ const app = {
 
     setExportRange(type) {
         const cosecha = document.getElementById('exp-cosecha-selector').value;
-        if (!this.harvestsInfo || !this.harvestsInfo[cosecha]) return;
+        if (!this.harvestsInfo || !this.harvestsInfo[cosecha]) {
+            this.showToast("No data available for this harvest yet", true);
+            return;
+        }
         
         const info = this.harvestsInfo[cosecha];
         if (type === 'start') {
             const date = info.config_start || info.first_image;
             if (date) document.getElementById('exp-date-from').value = date;
         } else if (type === 'end') {
-            const date = info.last_image || new Date().toISOString().split('T')[0];
-            if (date) document.getElementById('exp-date-to').value = date;
+            const lastImg = info.last_image || new Date().toISOString().split('T')[0];
+            document.getElementById('exp-date-to').value = lastImg;
         }
     },
 
@@ -722,19 +725,31 @@ const app = {
             list.innerHTML = '';
             
             data.forEach(video => {
-                const el = document.createElement('div');
-                el.className = 'export-item glass-panel sm';
-                el.innerHTML = `
-                    <div class="video-info">
-                        <strong>${video.name}</strong>
-                        <span>${video.date} • ${video.size}</span>
-                    </div>
-                    <div class="video-actions">
-                        <a href="/api/timelapse/download/${video.name}" class="btn-icon primary"><i class="fa-solid fa-download"></i></a>
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                
+                // Extract metadata from name if possible (Harvest_Date_Time)
+                const nameParts = video.name.split('_');
+                const harvestName = nameParts[0] || 'Unknown';
+                const dateRaw = nameParts[1] || '';
+                const displayDate = dateRaw.length === 8 ? `${dateRaw.slice(0,4)}-${dateRaw.slice(4,6)}-${dateRaw.slice(6,8)}` : video.date;
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <h4>${harvestName}</h4>
                         <button class="btn-icon danger" onclick="app.deleteVideo('${video.name}')"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
+                    <div class="video-meta">
+                        <span><i class="fa-solid fa-calendar"></i> ${displayDate}</span>
+                        <span><i class="fa-solid fa-clock"></i> ${video.date.split(' ')[1] || ''}</span>
+                        <span><i class="fa-solid fa-weight-hanging"></i> ${video.size}</span>
+                        <span><i class="fa-solid fa-file-invoice"></i> ${video.name}</span>
+                    </div>
+                    <div class="card-actions">
+                        <a href="/api/timelapse/download/${video.name}" class="btn primary sm"><i class="fa-solid fa-download"></i> Download MP4</a>
+                    </div>
                 `;
-                list.appendChild(el);
+                list.appendChild(card);
             });
         } catch(e) { console.error("Failed to load exports", e); }
     },
@@ -837,6 +852,7 @@ const app = {
         const plantData = this.fullConfig?.plants?.[cosechaName] || {};
         document.getElementById('cfg-cosecha-name').value = cosechaName;
         document.getElementById('cfg-start-date').value = plantData.start_date || '';
+        document.getElementById('cfg-timelapse-res').value = plantData.timelapse_resolution || '320x240';
 
         // Render Cycles
         this.cyclesList.innerHTML = '';
@@ -941,6 +957,8 @@ const app = {
             updatedConfig.timelapse_interval_minutes = timelapseInterval;
             updatedConfig.timelapse_enabled = timelapseEnabled;
             updatedConfig.sensor_log_interval_minutes = logInterval;
+            
+            const timelapseRes = document.getElementById('cfg-timelapse-res').value;
 
             // Harvest Plan Cycles
             const cycles = [];
@@ -976,6 +994,7 @@ const app = {
             updatedConfig.plants[cosechaName] = { 
                 name: cosechaName, 
                 start_date: startDate, 
+                timelapse_resolution: timelapseRes,
                 cycles: cycles 
             };
 

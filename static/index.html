@@ -260,6 +260,16 @@
                                 <input type="number" id="cfg-log-interval" min="1" max="60" placeholder="1">
                                 <small style="opacity: 0.6;">How often to save Temp/Hum to history.</small>
                             </div>
+                            <div class="input-group">
+                                <label>Timelapse Resolution (Photo Quality)</label>
+                                <select id="cfg-timelapse-res">
+                                    <option value="320x240">320x240 (Limp Mode - Fastest)</option>
+                                    <option value="640x480">640x480 (SD - Good Balance)</option>
+                                    <option value="1280x720">1280x720 (HD - Sharp Text)</option>
+                                    <option value="1920x1080">1920x1080 (Full HD - Heavy)</option>
+                                </select>
+                                <small style="opacity: 0.6;">High res may slow down video generation.</small>
+                            </div>
                             <hr style="opacity:0.1; margin:10px 0;">
                             <div class="cycles-editor">
                                 <div class="cycles-header">
@@ -321,9 +331,12 @@
                         </div>
 
                         <div id="exports-container" class="exports-list hidden">
-                            <h4><i class="fa-solid fa-file-video"></i> Generated Videos</h4>
+                            <div class="section-header">
+                                <h3><i class="fa-solid fa-file-video"></i> Generated Videos</h3>
+                                <small>MP4 exports grouped by capture date.</small>
+                            </div>
                             <div id="exports-list" class="exports-grid">
-                                <!-- MP4 files will be listed here -->
+                                <!-- Video cards will be injected here -->
                             </div>
                         </div>
                         
@@ -359,18 +372,16 @@
             <div class="input-row">
                 <div class="input-group">
                     <label>From Date</label>
-                    <div class="input-with-action">
-                        <input type="date" id="exp-date-from">
-                        <button class="btn secondary xs" onclick="app.setExportRange('start')" title="Harvest Start">Start</button>
-                    </div>
+                    <input type="date" id="exp-date-from">
                 </div>
                 <div class="input-group">
                     <label>To Date</label>
-                    <div class="input-with-action">
-                        <input type="date" id="exp-date-to">
-                        <button class="btn secondary xs" onclick="app.setExportRange('end')" title="Current Day">End</button>
-                    </div>
+                    <input type="date" id="exp-date-to">
                 </div>
+            </div>
+            <div class="helper-actions">
+                <button class="btn secondary sm" onclick="app.setExportRange('start')"><i class="fa-solid fa-calendar-check"></i> Set Start</button>
+                <button class="btn secondary sm" onclick="app.setExportRange('end')"><i class="fa-solid fa-calendar-day"></i> Set Today</button>
             </div>
             <div class="input-group">
                 <label>FPS (Speed)</label>

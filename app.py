@@ -115,12 +115,21 @@ class ApplicationSystem:
             hum = self.sensor_data.get("humidity")
             harvest = self.active_cosecha
             
-            # Fetch start date if available
+            # Fetch start date and resolution if available
             start_date = None
+            resolution = "320x240"
             if harvest in self.config_data.get("plants", {}):
-                start_date = self.config_data["plants"][harvest].get("start_date")
+                plant_cfg = self.config_data["plants"][harvest]
+                start_date = plant_cfg.get("start_date")
+                resolution = plant_cfg.get("timelapse_resolution", "320x240")
         
-        metadata = {"temp": temp, "hum": hum, "harvest": harvest, "start_date": start_date}
+        metadata = {
+            "temp": temp, 
+            "hum": hum, 
+            "harvest": harvest, 
+            "start_date": start_date,
+            "resolution": resolution
+        }
         
         # Implement retries for hardware resilience
         success = False
