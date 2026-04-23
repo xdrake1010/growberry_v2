@@ -22,10 +22,17 @@ class CameraController:
         self.last_frame = None
         self.last_fail_time = 0 # Timestamp of last failed probe
         self._probing = False   # Prevents concurrent probes (race condition guard)
+        self.flip_mode = 'none' # Persisted flip: none | h | v | both
 
     def set_cosecha_name(self, name):
         self.cosecha_name = name
         logger.info(f"Camera controller harvest name updated to: {name}")
+
+    def set_flip(self, mode):
+        """Sets the persistent flip mode applied to both live stream and timelapse captures."""
+        valid = ('none', 'h', 'v', 'both')
+        self.flip_mode = mode if mode in valid else 'none'
+        logger.info(f"Camera flip mode set to: {self.flip_mode}")
 
     def _ensure_dir(self, path):
         if not os.path.exists(path):
@@ -303,8 +310,14 @@ class CameraController:
                 camera.grab()
                 
             success, frame = camera.read()
-            
+
             if success:
+                # Apply flip if configured (same setting as live stream)
+                FLIP_CODES = {'h': 1, 'v': 0, 'both': -1}
+                flip_code = FLIP_CODES.get(self.flip_mode)
+                if flip_code is not None:
+                    frame = cv2.flip(frame, flip_code)
+
                 # Save clean frame — overlay is burned by FFmpeg at export time
                 cv2.imwrite(filepath, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
                 logger.info(f"Saved clean timelapse frame: {filepath}")

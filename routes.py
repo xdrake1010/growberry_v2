@@ -20,6 +20,8 @@ def video_feed():
     res = request.args.get('res', '640x480')
     # Accept flip mode: none | h (horizontal) | v (vertical) | both
     flip = request.args.get('flip', 'none')
+    # Persist flip mode so timelapse captures use the same orientation
+    _system.camera_controller.set_flip(flip)
     try:
         w, h = map(int, res.split('x'))
     except Exception:
@@ -28,6 +30,15 @@ def video_feed():
         _system.camera_controller.generate_live_stream(width=w, height=h, flip=flip),
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
+
+
+@api.route('/camera/flip', methods=['POST'])
+def set_camera_flip():
+    """Persists the flip mode for live stream and timelapse captures."""
+    data = request.json or {}
+    flip = data.get('flip', 'none')
+    _system.camera_controller.set_flip(flip)
+    return jsonify({'status': 'success', 'flip': flip})
 
 
 @api.route('/statistics', methods=['GET'])

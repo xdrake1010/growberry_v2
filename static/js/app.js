@@ -432,6 +432,12 @@ const app = {
         document.querySelectorAll('.flip-pill').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.flip === mode);
         });
+        // Persist on server so timelapse captures use same orientation
+        fetch('/api/camera/flip', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({flip: mode})
+        }).catch(e => console.warn('Could not persist flip to server:', e));
         const labels = { none: 'Normal', h: 'Mirror', v: 'Flip Vertical', both: 'Flipped' };
         this.showToast(`Orientation: ${labels[mode] || mode}`);
     },
@@ -1057,9 +1063,18 @@ const app = {
 
         const html = `
             <div class="cycle-item" id="${id}">
+                <div class="cycle-item-header">
+                    <span class="cycle-item-title"><i class="fa-solid fa-layer-group"></i> ${name || 'New Cycle'}</span>
+                    <div class="cycle-order-btns">
+                        <button class="btn-icon-sm" title="Move Up" onclick="app.moveCycle('${id}', -1)"><i class="fa-solid fa-chevron-up"></i></button>
+                        <button class="btn-icon-sm" title="Move Down" onclick="app.moveCycle('${id}', 1)"><i class="fa-solid fa-chevron-down"></i></button>
+                        <button class="btn-icon-sm danger" title="Remove" onclick="document.getElementById('${id}').remove()"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
                 <div class="input-group" style="margin-bottom:12px;">
                     <label>Cycle Name</label>
-                    <input type="text" class="cyc-name" value="${name}" placeholder="e.g. vegetation">
+                    <input type="text" class="cyc-name" value="${name}" placeholder="e.g. vegetation"
+                        oninput="document.querySelector('#${id} .cycle-item-title').innerHTML='<i class=\\'fa-solid fa-layer-group\\'></i> '+(this.value||'New Cycle')">
                 </div>
                 <div class="cycle-grid">
                     <div class="input-group"><label>Duration (days)</label><input type="number" class="cyc-duration" value="${config.duration_days || 7}"></div>
@@ -1098,10 +1113,27 @@ const app = {
                         `).join('')}
                     </div>
                 </div>
-                <button class="btn danger-sm" style="margin-top:12px;" onclick="document.getElementById('${id}').remove()">Remove Cycle</button>
             </div>
         `;
         this.cyclesList.insertAdjacentHTML('beforeend', html);
+    },
+
+    moveCycle(id, direction) {
+        const el = document.getElementById(id);
+        const parent = el.parentNode;
+        const items = Array.from(parent.querySelectorAll('.cycle-item'));
+        const idx = items.indexOf(el);
+        const target = items[idx + direction];
+        if (!target) return; // Already at boundary
+        if (direction === -1) {
+            parent.insertBefore(el, target);
+        } else {
+            parent.insertBefore(target, el);
+        }
+        // Brief flash to confirm move
+        el.style.transition = 'background 0.3s';
+        el.style.background = 'rgba(16,185,129,0.12)';
+        setTimeout(() => { el.style.background = ''; }, 400);
     },
 
     setStartDateToday() {

@@ -317,6 +317,53 @@ body {
     position: relative;
 }
 
+.cycle-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.cycle-item-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cycle-order-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-icon-sm {
+    background: rgba(255,255,255,0.05);
+    border: none;
+    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-icon-sm:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-main);
+}
+
+.btn-icon-sm.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--danger);
+}
+
 .cycle-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
