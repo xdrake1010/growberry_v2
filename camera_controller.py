@@ -1,3 +1,4 @@
+import subprocess
 import cv2
 import os
 import time
@@ -20,6 +21,7 @@ class CameraController:
         self.shared_camera = None
         self.last_frame = None
         self.last_fail_time = 0 # Timestamp of last failed probe
+        self._probing = False   # Prevents concurrent probes (race condition guard)
 
     def set_cosecha_name(self, name):
         self.cosecha_name = name
@@ -71,47 +73,114 @@ class CameraController:
             logger.info(f"[IDLE] Camera is in cooldown ({int(cooldown_period - time_since_fail)}s remaining).")
             return None
 
-        max_attempts = 2 
-        for attempt in range(max_attempts):
-            indices_to_try = [0, 1] if self.camera_index not in [0, 1] else [self.camera_index, 1 - self.camera_index]
-            
-            for idx in indices_to_try:
-                backends = [cv2.CAP_V4L2, cv2.CAP_ANY]
-                for backend in backends:
+        # RACE CONDITION GUARD: Only one thread may probe the camera at a time.
+        # If another thread is already probing, wait briefly then check if camera is ready.
+        if self._probing:
+            logger.info("[PROBE] Another thread is already probing. Waiting...")
+            for _ in range(20):  # Wait up to 20s
+                time.sleep(1)
+                if self.shared_camera is not None:
+                    return self.shared_camera
+                if not self._probing:
+                    break
+            return self.shared_camera  # May be None if still failed
+
+        self._probing = True
+        try:
+            # First, ensure the uvcvideo kernel module is healthy
+            self._ensure_uvcvideo_driver()
+
+            # Always probe at low resolution first (YUYV @ 640x480 can timeout on USB)
+            # then set the requested resolution after confirming the camera works.
+            PROBE_W, PROBE_H = 320, 240
+
+            max_attempts = 2
+            for attempt in range(max_attempts):
+                indices_to_try = [0, 1] if self.camera_index not in [0, 1] else [self.camera_index, 1 - self.camera_index]
+
+                for idx in indices_to_try:
                     try:
-                        logger.info(f"[PROBE] Trying index {idx} with resolution {width}x{height}")
-                        cap = cv2.VideoCapture(idx, backend)
-                        if cap.isOpened():
-                            time.sleep(1.5) 
-                            
-                            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-                            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-                            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-                            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                            
-                            # Warm-up: Stabilization
-                            for _ in range(25):
-                                cap.grab()
-                            
-                            success, frame = cap.read()
-                            if success and frame is not None:
-                                actual_w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-                                actual_h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-                                logger.info(f"[SUCCESS] Camera {idx} is UP at {actual_w}x{actual_h}.")
-                                self.camera_index = idx 
-                                self.shared_camera = cap
-                                return cap
-                            else:
-                                cap.release()
-                        else: pass 
+                        logger.info(f"[PROBE] Trying index {idx} at {PROBE_W}x{PROBE_H} (YUYV)")
+                        cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+                        if not cap.isOpened():
+                            logger.info(f"[PROBE] Cannot open camera index {idx}.")
+                            continue
+
+                        time.sleep(0.5)
+
+                        # IMPORTANT: This camera (IMC Networks 13d3:5120) only supports YUYV, NOT MJPG.
+                        # Setting MJPG causes immediate select() timeouts. Use YUYV.
+                        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, PROBE_W)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PROBE_H)
+                        cap.set(cv2.CAP_PROP_FPS, 10)  # Conservative FPS for YUYV on Pi
+                        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+                        # Warm-up flush
+                        for _ in range(3):
+                            cap.grab()
+
+                        success, frame = cap.read()
+                        if success and frame is not None:
+                            # Now switch to requested resolution if different
+                            if width != PROBE_W or height != PROBE_H:
+                                cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                                for _ in range(3): cap.grab()  # flush after resize
+
+                            actual_w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                            actual_h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                            logger.info(f"[SUCCESS] Camera {idx} is UP at {actual_w}x{actual_h} (YUYV).")
+                            self.camera_index = idx
+                            self.shared_camera = cap
+                            return cap
+                        else:
+                            logger.warning(f"[PROBE] Camera {idx} opened but failed to read frame.")
+                            cap.release()
                     except Exception as e:
                         logger.warning(f"Error opening camera {idx}: {e}")
-            
-            if attempt < max_attempts - 1:
-                time.sleep(2.0)
-        
-        self.last_fail_time = time.time()
-        return None
+
+                if attempt < max_attempts - 1:
+                    logger.info(f"[RETRY] Attempt {attempt+1} failed, retrying in 2s...")
+                    time.sleep(2.0)
+
+            self.last_fail_time = time.time()
+            self._reset_usb()
+            return None
+        finally:
+            self._probing = False
+
+    def _ensure_uvcvideo_driver(self):
+        """Ensures the uvcvideo kernel module is loaded and /dev/video0 exists.
+        This recovers from the driver being deregistered (e.g. after USB errors).
+        """
+        try:
+            has_video0 = os.path.exists('/dev/video0')
+            if not has_video0:
+                logger.warning("[SYSTEM] /dev/video0 missing — reloading uvcvideo driver...")
+                subprocess.run(['sudo', 'modprobe', '-r', 'uvcvideo'], timeout=5)
+                time.sleep(1)
+                subprocess.run(['sudo', 'modprobe', 'uvcvideo'], timeout=5)
+                time.sleep(2)
+                if os.path.exists('/dev/video0'):
+                    logger.info("[SYSTEM] uvcvideo reloaded successfully — /dev/video0 is back.")
+                else:
+                    logger.error("[SYSTEM] /dev/video0 still missing after driver reload.")
+        except Exception as e:
+            logger.error(f"[SYSTEM] Failed to reload uvcvideo: {e}")
+
+    def _reset_usb(self):
+        """Triggers system-level USB reset for the camera."""
+        script_path = os.path.join(os.path.dirname(__file__), "usb_reset.sh")
+        if os.path.exists(script_path):
+            try:
+                logger.warning("[SYSTEM] Camera protocol error. Resetting USB bus...")
+                subprocess.run(["sudo", script_path], check=True, timeout=15)
+                time.sleep(3) # Wait for re-enumeration
+            except Exception as e:
+                logger.error(f"Failed to reset USB: {e}")
+        else:
+            logger.error(f"Reset script not found: {script_path}")
                 
         return None
 
@@ -252,8 +321,13 @@ class CameraController:
             logger.error(f"Error capturing timelapse: {e}")
             return False
 
-    def generate_live_stream(self, width=640, height=480):
-        """Generator for the MJPEG stream. Accepts resolution params for UI selector."""
+    def generate_live_stream(self, width=640, height=480, flip='none'):
+        """Generator for the MJPEG stream. Accepts resolution and flip params.
+        flip: 'none' | 'h' (horizontal) | 'v' (vertical) | 'both'
+        """
+        # Map flip mode to cv2.flip() flipCode
+        FLIP_CODES = {'h': 1, 'v': 0, 'both': -1}
+        flip_code = FLIP_CODES.get(flip, None)  # None = no flip
         with self.lock:
             self.client_count += 1
             self.is_streaming = True
@@ -285,7 +359,11 @@ class CameraController:
                     continue
                 
                 retry_count = 0
-                
+
+                # Apply flip transform if requested
+                if flip_code is not None:
+                    frame = cv2.flip(frame, flip_code)
+
                 # Compress for web — heavier at higher res to balance bandwidth
                 quality = 60 if width >= 1280 else 55
                 ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), quality])

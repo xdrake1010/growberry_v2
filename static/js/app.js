@@ -9,6 +9,7 @@ const app = {
         
         try {
             this.initTheme();
+            this.initCameraFlip();
             this.galleryState = { cosecha: null, date: null, rawData: [] };
             this.fetchStats();
             this.loadConfigToForm(); // Pre-load config for quick settings access
@@ -402,21 +403,50 @@ const app = {
         const img = document.getElementById('live-video');
         img.src = '';
         const res = this._currentLiveRes || '640x480';
+        const flip = this._currentFlip || 'none';
         setTimeout(() => {
-            img.src = `/api/video_feed?res=${res}&t=${Date.now()}`;
+            img.src = `/api/video_feed?res=${res}&flip=${flip}&t=${Date.now()}`;
         }, 100);
         this.showToast('Camera feed reloaded');
     },
 
     changeLiveResolution(res) {
         this._currentLiveRes = res;
+        const flip = this._currentFlip || 'none';
         const img = document.getElementById('live-video');
-        img.src = `/api/video_feed?res=${res}&t=${Date.now()}`;
-        // Update pill active state
-        document.querySelectorAll('.res-pill').forEach(btn => {
+        img.src = `/api/video_feed?res=${res}&flip=${flip}&t=${Date.now()}`;
+        // Update pill active state (only res-pills with data-res)
+        document.querySelectorAll('.res-pill[data-res]').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.res === res);
         });
         this.showToast(`Stream: ${res}`);
+    },
+
+    setCameraFlip(mode) {
+        this._currentFlip = mode;
+        localStorage.setItem('growberry_flip', mode);
+        const res = this._currentLiveRes || '640x480';
+        const img = document.getElementById('live-video');
+        img.src = `/api/video_feed?res=${res}&flip=${mode}&t=${Date.now()}`;
+        // Update flip pill active state
+        document.querySelectorAll('.flip-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.flip === mode);
+        });
+        const labels = { none: 'Normal', h: 'Mirror', v: 'Flip Vertical', both: 'Flipped' };
+        this.showToast(`Orientation: ${labels[mode] || mode}`);
+    },
+
+    initCameraFlip() {
+        const saved = localStorage.getItem('growberry_flip') || 'none';
+        this._currentFlip = saved;
+        document.querySelectorAll('.flip-pill').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.flip === saved);
+        });
+        if (saved !== 'none') {
+            const img = document.getElementById('live-video');
+            const res = this._currentLiveRes || '640x480';
+            if (img) img.src = `/api/video_feed?res=${res}&flip=${saved}&t=${Date.now()}`;
+        }
     },
 
     async captureFrame() {

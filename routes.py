@@ -18,12 +18,14 @@ def video_feed():
         return "System Not Init", 500
     # Accept resolution via ?res=WxH (e.g. ?res=640x480)
     res = request.args.get('res', '640x480')
+    # Accept flip mode: none | h (horizontal) | v (vertical) | both
+    flip = request.args.get('flip', 'none')
     try:
         w, h = map(int, res.split('x'))
     except Exception:
         w, h = 640, 480
     return Response(
-        _system.camera_controller.generate_live_stream(width=w, height=h),
+        _system.camera_controller.generate_live_stream(width=w, height=h, flip=flip),
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
 
